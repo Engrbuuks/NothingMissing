@@ -6,13 +6,14 @@ export const dynamic = 'force-dynamic';
 /**
  * The field page. No account, no password, no session — just a token in the URL.
  *
- * It uses a bare anon client rather than the session-aware one on purpose:
- * whoever opens this is not signed in and never will be. Everything they can
- * do is bounded by app.submit_from_link(), which checks the token, the verbs
- * granted, and the location, and writes a pending row rather than a change.
+ * Everything it shows comes from app.link_context(), which takes the token and
+ * returns only what belongs to that link's own location. It cannot query the
+ * tables directly and should not be able to: anon is denied on all of them,
+ * which is what stops a forwarded link becoming a window into the register.
  *
- * The count deliberately does NOT show the system figure. If it did, the
- * counter would agree with it and the count would be worthless.
+ * The count deliberately shows no quantities. A counter who can see what the
+ * system expects will agree with it, and the count is then worthless. The
+ * comparison happens on the reviewer's screen, never here.
  */
 const anon = () =>
   createClient(
@@ -26,9 +27,11 @@ async function submit(formData: FormData) {
   const token = String(formData.get('token'));
   const kind = String(formData.get('kind'));
 
-  const lines = [];
+  const lines: { sku: string; qty: number }[] = [];
   for (const [k, v] of formData.entries()) {
     if (k.startsWith('qty_') && String(v).trim() !== '') {
+      // A blank box means "not counted", which is not the same as zero.
+      // Forcing a number there manufactures a variance out of nothing.
       lines.push({ sku: k.slice(4), qty: Number(v) });
     }
   }
@@ -38,24 +41,27 @@ async function submit(formData: FormData) {
     p_kind: kind,
     p_note: (formData.get('note') as string) || null,
     p_device: 'Web',
-    p_lines: lines.length ? lines : null,
+    p_lines: kind === 'count' ? lines : null,
     p_asset: (formData.get('asset') as string) || null,
     p_fault: (formData.get('fault') as string) || null,
   });
 
   const { redirect } = await import('next/navigation');
-  redirect(error ? `/field/${token}?error=${encodeURIComponent(error.message)}` : `/field/${token}?sent=1`);
+  redirect(
+    error ? `/l/${token}?error=${encodeURIComponent(error.message)}` : `/l/${token}?sent=1`
+  );
 }
 
 export default async function Field({
-  params, searchParams,
-}: { params: { token: string }; searchParams: { sent?: string; error?: string } }) {
-  const supabase = anon();
+  params,
+  searchParams,
+}: {
+  params: { token: string };
+  searchParams: { sent?: string; error?: string };
+}) {
+  const { data: ctx } = await anon().rpc('link_context', { p_token: params.token });
 
-  const { data: resolved } = await supabase.rpc('resolve_link', { p_token: params.token });
-  const link = Array.isArray(resolved) ? resolved[0] : resolved;
-
-  if (!link) {
+  if (!ctx?.valid) {
     return (
       <main style={{ maxWidth: 520, margin: '0 auto', padding: '60px 20px' }}>
         <h1 style={{ fontSize: 22 }}>This link is no longer valid</h1>
@@ -64,14 +70,16 @@ export default async function Field({
           incompletely. Ask your manager for a new one.
         </p>
         <p style={{ color: 'var(--text-3)', marginTop: 14, fontSize: 12.5, lineHeight: 1.6 }}>
-          {/* Deliberately vague to the visitor: telling someone which of the four
-              it is lets them probe for valid tokens. The audit log records every
-              attempt, so a manager can see what actually happened. */}
           If you copied this address by hand, check nothing was cut off the end.
         </p>
       </main>
     );
   }
+
+  const verbs: string[] = ctx.verbs ?? [];
+  const items: { sku: string; name: string; unit: string }[] = ctx.items ?? [];
+  const assets: { id: string; tag: string; name: string }[] = ctx.assets ?? [];
+  const can = (v: string) => verbs.includes(v);
 
   if (searchParams.sent) {
     return (
@@ -83,7 +91,7 @@ export default async function Field({
               Your manager has it now. Nothing on the register changes until they confirm
               it, and anything that differs from the system will be checked with you first.
             </p>
-            <a className="btn btn-g" href={`/field/${params.token}`} style={{ marginTop: 22 }}>
+            <a className="btn btn-g" href={`/l/${params.token}`} style={{ marginTop: 22 }}>
               Send something else
             </a>
           </div>
@@ -92,78 +100,186 @@ export default async function Field({
     );
   }
 
-  const { data: items } = await supabase
-    .from('stock_items').select('sku, name, unit').is('archived_at', null).order('sku');
-
-  const { data: assets } = await supabase
-    .from('assets').select('id, tag, name').eq('location_id', link.location_id).order('tag');
-
-  const can = (v: string) => (link.verbs ?? []).includes(v);
-
   return (
-    <main style={{ maxWidth: 520, margin: '0 auto', padding: '32px 16px 60px' }}>
-      <h1 style={{ fontSize: 23 }}>What would you like to send?</h1>
-      <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 6 }}>
-        Anything you send goes to your manager to check first.
-      </p>
+    <main
+      style={
+        {
+          maxWidth: 520,
+          margin: '0 auto',
+          padding: '32px 16px 60px',
+          ['--brand' as string]: ctx.brand ?? '#5B4BE8',
+        } as React.CSSProperties
+      }
+    >
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600 }}>
+          {ctx.company}
+        </div>
+        <h1 style={{ fontSize: 23, marginTop: 4 }}>
+          {ctx.holder
+            ? `Hello, ${String(ctx.holder).split(' ')[0]}`
+            : 'What would you like to send?'}
+        </h1>
+        <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 6 }}>
+          {ctx.location} · anything you send goes to your manager to check first.
+        </p>
+      </div>
 
-      {searchParams.error && <div className="notice bad" style={{ marginTop: 18 }}><p>{searchParams.error}</p></div>}
+      {searchParams.error && (
+        <div className="notice bad">
+          <p>{searchParams.error}</p>
+        </div>
+      )}
 
-      {can('count') && (items ?? []).length > 0 && (
-        <form action={submit} className="card" style={{ marginTop: 18 }}>
+      {can('count') && (
+        <form action={submit} className="card" style={{ marginBottom: 16 }}>
           <input type="hidden" name="token" value={params.token} />
           <input type="hidden" name="kind" value="count" />
           <div className="card-h bd">
             <div>
               <div className="card-t">Stock count</div>
-              <div className="card-s">Count what is in front of you. Leave anything you could not reach blank — blank is not zero.</div>
-            </div>
-          </div>
-          {(items ?? []).map((i: any) => (
-            <div key={i.sku} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--line-2)' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="aname">{i.name}</div>
-                <div className="amake"><span className="tag">{i.sku}</span> · {i.unit}</div>
+              <div className="card-s">
+                Count what is in front of you. Leave anything you could not reach blank —
+                blank is not zero.
               </div>
-              <input className="inp" style={{ width: 110 }} name={`qty_${i.sku}`} type="number" step="any" min="0" placeholder="—" inputMode="decimal" />
             </div>
-          ))}
-          <div style={{ padding: 18 }}>
-            <input className="inp" name="note" placeholder="Anything your manager should know" />
-            <div className="hint">A variance with an explanation gets accepted. One without gets questioned.</div>
-            <div style={{ height: 14 }} />
-            <button className="btn btn-p" type="submit" style={{ width: '100%' }}>Send the count</button>
           </div>
+          {items.length === 0 ? (
+            <div className="empty">
+              <h4>No stock items set up yet</h4>
+              <p>
+                Your company has not added any consumables to count. Ask your manager to add
+                them first.
+              </p>
+            </div>
+          ) : (
+            <>
+              {items.map((i) => (
+                <div
+                  key={i.sku}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '13px 18px',
+                    borderBottom: '1px solid var(--line-2)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="aname">{i.name}</div>
+                    <div className="amake">
+                      <span className="tag">{i.sku}</span> · {i.unit}
+                    </div>
+                  </div>
+                  <input
+                    className="inp"
+                    style={{ width: 110 }}
+                    name={`qty_${i.sku}`}
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="—"
+                    inputMode="decimal"
+                  />
+                </div>
+              ))}
+              <div style={{ padding: 18 }}>
+                <input className="inp" name="note" placeholder="Anything your manager should know" />
+                <div className="hint">
+                  A variance with an explanation gets accepted. One without gets questioned.
+                </div>
+                <div style={{ height: 14 }} />
+                <button className="btn btn-p" type="submit" style={{ width: '100%' }}>
+                  Send the count
+                </button>
+              </div>
+            </>
+          )}
         </form>
       )}
 
-      {can('fault') && (assets ?? []).length > 0 && (
-        <form action={submit} className="card" style={{ marginTop: 18 }}>
+      {can('fault') && (
+        <form action={submit} className="card" style={{ marginBottom: 16 }}>
           <input type="hidden" name="token" value={params.token} />
           <input type="hidden" name="kind" value="fault" />
           <div className="card-h bd">
             <div>
               <div className="card-t">Report a fault</div>
-              <div className="card-s">Your manager sees this straight away, with your name on it</div>
+              <div className="card-s">
+                Your manager sees this straight away, with your name on it
+              </div>
             </div>
           </div>
-          <div style={{ padding: 18, display: 'grid', gap: 12 }}>
-            <select className="inp" name="asset" required>
-              {(assets ?? []).map((a: any) => <option key={a.id} value={a.id}>{a.tag} — {a.name}</option>)}
-            </select>
-            <select className="inp" name="fault">
-              <option>Not working at all</option>
-              <option>Working, but faulty</option>
-              <option>Physically damaged</option>
-              <option>Missing from site</option>
-            </select>
-            <input className="inp" name="note" placeholder="What happened, and whether it is safe to leave" />
-            <button className="btn btn-p" type="submit">Send the report</button>
-          </div>
+          {assets.length === 0 ? (
+            <div className="empty">
+              <h4>Nothing at this location yet</h4>
+              <p>No assets are on the register here, so there is nothing to report against.</p>
+            </div>
+          ) : (
+            <div style={{ padding: 18, display: 'grid', gap: 12 }}>
+              <div>
+                <label className="lbl" htmlFor="asset">
+                  Which item
+                </label>
+                <select className="inp" id="asset" name="asset" required>
+                  {assets.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.tag} — {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="lbl" htmlFor="fault">
+                  What is wrong
+                </label>
+                <select className="inp" id="fault" name="fault" required>
+                  <option>Not working at all</option>
+                  <option>Working, but faulty</option>
+                  <option>Physically damaged</option>
+                  <option>Missing from site</option>
+                </select>
+              </div>
+              <div>
+                <label className="lbl" htmlFor="note">
+                  Describe it
+                </label>
+                <input
+                  className="inp"
+                  id="note"
+                  name="note"
+                  placeholder="What happened, and whether it is safe to leave as it is"
+                />
+              </div>
+              <button className="btn btn-p" type="submit">
+                Send the report
+              </button>
+            </div>
+          )}
         </form>
       )}
 
-      <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', marginTop: 26, lineHeight: 1.6 }}>
+      {!can('count') && !can('fault') && (
+        <div className="card">
+          <div className="empty">
+            <h4>Nothing to do here</h4>
+            <p>
+              This link was not granted permission to submit anything. Ask your manager for
+              one that is.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <p
+        style={{
+          textAlign: 'center',
+          fontSize: 12,
+          color: 'var(--text-3)',
+          marginTop: 24,
+          lineHeight: 1.6,
+        }}
+      >
         Your name, the time and this device are recorded with everything you send.
       </p>
     </main>
