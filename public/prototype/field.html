@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ibadan Depot — Zenith Facilities Ltd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#5B4BE8;--brand-soft:#EEEBFE;--brand-ink:#3B2FB0;
+  --ink:#101223;--canvas:#F3F4FB;--surface:#fff;
+  --text:#14161F;--text-2:#5F6379;--text-3:#9296AC;--line:#E8E9F2;--line-2:#F1F2F8;
+  --ok:#0FA45E;--ok-soft:#E4F7ED;--warn:#E39A11;--warn-soft:#FDF3E0;--bad:#E14B42;--bad-soft:#FDECEB;
+  --sans:'Inter',system-ui,sans-serif;--display:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--canvas);color:var(--text);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-bottom:44px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.25}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+.mono{font-family:var(--mono)}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px}
+
+.hdr{background:var(--ink);padding:20px 0 26px;position:relative;overflow:hidden;margin-bottom:-16px}
+.hdr::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.05) 1px,transparent 0);background-size:20px 20px}
+.hdr::after{content:'';position:absolute;top:-130px;right:-70px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,var(--brand) 0%,transparent 70%);opacity:.45}
+.hdr-r{position:relative;z-index:1}
+.hdr-top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.logo{width:42px;height:42px;border-radius:13px;background:var(--brand);display:grid;place-items:center;font-family:var(--display);font-weight:800;color:#fff;font-size:15px;letter-spacing:-.04em;flex:none}
+.co{color:#fff;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.02em}
+.co-s{color:#8B90B2;font-size:12px;margin-top:1px}
+.who{margin-left:auto;text-align:right;flex:none}
+.who-n{color:#fff;font-size:12.5px;font-weight:600}
+.who-r{color:#71769A;font-size:11px}
+.hdr h1{color:#fff;font-size:23px;font-weight:800}
+.hdr p{color:#8B90B2;font-size:13.5px;margin-top:6px}
+.scopepill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);color:#C9CCE2;font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:20px;margin-top:15px}
+.scopepill svg{width:13px;height:13px;stroke:currentColor;flex:none}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:14px}
+.card-h{padding:18px 18px 0}
+.card-t{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.02em}
+.card-s{font-size:13px;color:var(--text-3);margin-top:3px}
+.pad{padding:16px 18px 18px}
+
+.tiles{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;align-items:center;gap:15px;text-align:left;transition:.18s;width:100%}
+.tile:active{transform:scale(.985)}
+.tile-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none}
+.tile-ic svg{width:21px;height:21px;stroke:currentColor}
+.tile-t{font-size:16px;font-weight:600;font-family:var(--display);letter-spacing:-.02em;display:block}
+.tile-m{font-size:13px;color:var(--text-3);margin-top:2px;line-height:1.45;display:block}
+.tile-go{margin-left:auto;flex:none;color:var(--text-3)}
+.tile-go svg{width:19px;height:19px;stroke:currentColor}
+
+.row{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.row:last-child{border-bottom:none}
+.row-b{flex:1;min-width:130px}
+.row-n{font-size:14.5px;font-weight:600}
+.row-m{font-size:12px;color:var(--text-3);margin-top:2px}
+.qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:none}
+.qty button{width:42px;height:46px;display:grid;place-items:center;transition:.13s;font-size:19px;color:var(--text-2)}
+.qty button:active{background:var(--brand-soft)}
+.qty input{width:78px;height:46px;text-align:center;border:none;border-left:1px solid var(--line);border-right:1px solid var(--line);font-family:var(--mono);font-size:16px;font-weight:600;background:var(--surface)}
+.qty input:focus{outline:none;background:var(--brand-soft)}
+.qty input::placeholder{color:var(--text-3);font-weight:400}
+
+.lbl{font-size:13px;font-weight:600;display:block;margin-bottom:8px}
+.inp,.ta,.selx{width:100%;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--surface);font-size:15px}
+.ta{min-height:92px;resize:vertical;font-family:var(--sans)}
+.inp:focus,.ta:focus,.selx:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.hint{font-size:12.5px;color:var(--text-3);margin-top:8px;line-height:1.5}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:16px;border-radius:14px;font-size:16px;font-weight:600;transition:.15s}
+.btn svg{width:18px;height:18px;stroke:currentColor;flex:none}
+.btn-p{background:var(--brand);color:#fff;box-shadow:0 8px 20px -10px var(--brand)}
+.btn-p:active{transform:scale(.99)}
+.btn-p:disabled{opacity:.42;box-shadow:none;cursor:not-allowed}
+.btn-g{background:var(--surface);border:1px solid var(--line);color:var(--text)}
+
+.notice{display:flex;gap:12px;background:var(--brand-soft);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.notice svg{width:19px;height:19px;stroke:var(--brand-ink);flex:none;margin-top:1px}
+.notice p{font-size:13px;color:var(--brand-ink);line-height:1.55}
+.notice.amber{background:var(--warn-soft)}
+.notice.amber svg{stroke:#A6700A}
+.notice.amber p{color:#A6700A}
+
+.done{text-align:center;padding:40px 20px}
+.done-ic{width:74px;height:74px;border-radius:24px;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;margin:0 auto 20px}
+.done-ic svg{width:34px;height:34px;stroke:currentColor;stroke-width:2.6}
+.done h2{font-size:21px;margin-bottom:10px}
+.done p{font-size:14px;color:var(--text-2);max-width:350px;margin:0 auto;line-height:1.6}
+.ref{font-family:var(--mono);font-size:13px;font-weight:700;background:var(--line-2);padding:9px 14px;border-radius:10px;display:inline-block;margin-top:18px}
+.next{text-align:left;background:#FBFBFE;border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:22px}
+.next-t{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin-bottom:11px}
+.nx{display:flex;gap:11px;padding:7px 0;font-size:13px;color:var(--text-2);line-height:1.5}
+.nx i{width:20px;height:20px;border-radius:7px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;flex:none;font-size:10.5px;font-weight:700;font-style:normal;margin-top:1px}
+
+.hist{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.hist:last-child{border-bottom:none}
+.hist-ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none}
+.hist-ic svg{width:15px;height:15px;stroke:currentColor}
+.hist-t{font-size:13.5px;font-weight:600}
+.hist-m{font-size:12px;color:var(--text-3);margin-top:2px}
+
+.foot{text-align:center;padding:24px 20px 0;font-size:12px;color:var(--text-3);line-height:1.6}
+.step{display:none}
+.step.on{display:block;animation:f .28s ease}
+@keyframes f{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="hdr"><div class="wrap hdr-r">
+  <div class="hdr-top">
+    <span class="logo">ZF</span>
+    <div><div class="co">Zenith Facilities Ltd</div><div class="co-s">Ibadan Depot &middot; Bodija</div></div>
+    <div class="who" id="who" style="display:none"><div class="who-n" id="whoN"></div><div class="who-r">Ibadan Depot</div></div>
+  </div>
+  <h1 id="hTitle">Before we start</h1>
+  <p id="hSub">Tell us who you are. You only do this once on this phone.</p>
+  <span class="scopepill"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  Ibadan Depot only &middot; expires 12 Aug 2026</span>
+</div></header>
+
+<main class="wrap" style="padding-top:30px">
+
+<section class="step on" id="s-who">
+  <div class="card">
+    <div class="card-h"><div class="card-t">Who is submitting?</div>
+    <div class="card-s">Your name goes on everything you send, so your manager knows who counted what.</div></div>
+    <div class="pad">
+      <label class="lbl" for="nm">Your name</label>
+      <input class="inp" id="nm" placeholder="e.g. Musa Adeyinka" autocomplete="name">
+      <div style="height:16px"></div>
+      <label class="lbl" for="ph">Phone number</label>
+      <input class="inp" id="ph" type="tel" placeholder="0803 000 0000" autocomplete="tel">
+      <div class="hint">Only used to message you when your manager has reviewed what you sent.</div>
+    </div>
+  </div>
+  <div class="notice"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <p>There is no password and no account. This link works only for Ibadan Depot, and only until it expires or is revoked.</p></div>
+  <button class="btn btn-p" onclick="saveWho()">Continue</button>
+</section>
+
+<section class="step" id="s-menu">
+  <div class="tiles">
+    <button class="tile" onclick="show('count')">
+      <span class="tile-ic" style="background:#EEEBFE;color:#5B4BE8"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></span>
+      <span style="min-width:0"><span class="tile-t">Submit a stock count</span><span class="tile-m">Enter what you physically counted</span></span>
+      <span class="tile-go"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+    </button>
+    <button class="tile" onclick="show('damage')">
+      <span class="tile-ic" style="background:#FDF3E0;color:#E39A11"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+      <span style="min-width:0"><span class="tile-t">Report damage or a fault</span><span class="tile-m">Flag something broken or missing</span></span>
+      <span class="tile-go"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+    </button>
+  </div>
+  <div class="notice"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <p>Nothing you send changes the register on its own. It goes to Tunde Adeyemi to check first.</p></div>
+  <div class="card">
+    <div class="card-h"><div class="card-t">What you have sent</div><div class="card-s">Your last few submissions and how they went</div></div>
+    <div style="height:8px"></div>
+    <div class="hist"><span class="hist-ic" style="background:#E4F7ED;color:#0FA45E"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+      <div><div class="hist-t">Stock count &middot; 6 items</div><div class="hist-m">18 July &middot; accepted in full</div></div></div>
+    <div class="hist"><span class="hist-ic" style="background:#FDF3E0;color:#E39A11"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+      <div><div class="hist-t">Stock count &middot; 5 items</div><div class="hist-m">4 July &middot; 4 accepted, 1 adjusted by Tunde</div></div></div>
+    <div class="hist"><span class="hist-ic" style="background:#E4F7ED;color:#0FA45E"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+      <div><div class="hist-t">Fault report &middot; generator</div><div class="hist-m">27 June &middot; a repair was raised</div></div></div>
+  </div>
+</section>
+
+<section class="step" id="s-count">
+  <div class="notice amber"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    <p><b>Count first, then type.</b> We deliberately do not show you what the system thinks is there. If we did, it would be too easy to just agree with it. Your manager compares the two afterwards.</p></div>
+  <div class="card">
+    <div class="card-h"><div class="card-t">What did you count?</div><div class="card-s">Leave anything you could not reach blank. Blank is not the same as zero.</div></div>
+    <div style="height:12px"></div>
+    <div class="row"><div class="row-b"><div class="row-n">Diesel (AGO)</div><div class="row-m mono">CON-AGO-001 &middot; litres</div></div>
+      <div class="qty"><button onclick="bump('q1',-50)">&minus;</button><input id="q1" inputmode="numeric" placeholder="&mdash;" oninput="count()"><button onclick="bump('q1',50)">+</button></div></div>
+    <div class="row"><div class="row-b"><div class="row-n">Engine oil 15W-40</div><div class="row-m mono">CON-OIL-002 &middot; litres</div></div>
+      <div class="qty"><button onclick="bump('q2',-5)">&minus;</button><input id="q2" inputmode="numeric" placeholder="&mdash;" oninput="count()"><button onclick="bump('q2',5)">+</button></div></div>
+    <div class="row"><div class="row-b"><div class="row-n">Safety helmet</div><div class="row-m mono">CON-PPE-021 &middot; units</div></div>
+      <div class="qty"><button onclick="bump('q3',-1)">&minus;</button><input id="q3" inputmode="numeric" placeholder="&mdash;" oninput="count()"><button onclick="bump('q3',1)">+</button></div></div>
+    <div class="row"><div class="row-b"><div class="row-n">Hi-vis vest</div><div class="row-m mono">CON-PPE-022 &middot; units</div></div>
+      <div class="qty"><button onclick="bump('q4',-5)">&minus;</button><input id="q4" inputmode="numeric" placeholder="&mdash;" oninput="count()"><button onclick="bump('q4',5)">+</button></div></div>
+    <div class="row"><div class="row-b"><div class="row-n">A4 paper ream</div><div class="row-m mono">CON-PPR-051 &middot; reams</div></div>
+      <div class="qty"><button onclick="bump('q5',-5)">&minus;</button><input id="q5" inputmode="numeric" placeholder="&mdash;" oninput="count()"><button onclick="bump('q5',5)">+</button></div></div>
+    <div class="pad">
+      <label class="lbl">Anything your manager should know</label>
+      <textarea class="ta" placeholder="For example: a drum was leaking so I counted it part full, or the far rack was not reachable"></textarea>
+      <div class="hint">This is the most useful box on the page. A variance with an explanation gets accepted. One without gets questioned.</div>
+    </div>
+  </div>
+  <button class="btn btn-p" id="cBtn" disabled onclick="finish('count')"><span id="cLbl">Enter at least one count</span></button>
+  <div style="height:10px"></div>
+  <button class="btn btn-g" onclick="show('menu')">Back</button>
+</section>
+
+<section class="step" id="s-damage">
+  <div class="card">
+    <div class="card-h"><div class="card-t">Report damage or a fault</div><div class="card-s">Your manager sees this straight away, with your name on it.</div></div>
+    <div class="pad">
+      <label class="lbl">Which item</label>
+      <select class="selx">
+        <option>ZF-GEN-0042 &mdash; Mikano 60 kVA</option>
+        <option>ZF-IT-0189 &mdash; HP LaserJet M428</option>
+        <option>ZF-VEH-0013 &mdash; Toyota Hiace bus</option>
+        <option>ZF-HV-0073 &mdash; Hisense standing AC</option>
+        <option>I cannot find it in this list</option>
+      </select>
+      <div style="height:16px"></div>
+      <label class="lbl">What is wrong</label>
+      <select class="selx">
+        <option>Not working at all</option><option>Working, but faulty</option>
+        <option>Physically damaged</option><option>Missing from site</option>
+      </select>
+      <div style="height:16px"></div>
+      <label class="lbl">Describe it</label>
+      <textarea class="ta" placeholder="What happened, when you noticed it, and whether it is safe to leave as it is"></textarea>
+      <div style="height:16px"></div>
+      <label class="lbl">Photo</label>
+      <button class="btn btn-g" onclick="alert('The camera opens here on a real device.')">Take a photo</button>
+      <div class="hint">A fault report with a photo is much harder to argue with three weeks later.</div>
+    </div>
+  </div>
+  <button class="btn btn-p" onclick="finish('damage')">Send report</button>
+  <div style="height:10px"></div>
+  <button class="btn btn-g" onclick="show('menu')">Back</button>
+</section>
+
+<section class="step" id="s-done">
+  <div class="card"><div class="done">
+    <div class="done-ic"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+    <h2 id="dTitle">Sent</h2>
+    <p id="dBody"></p>
+    <div class="ref" id="dRef">SUB-2026-4471</div>
+    <div class="next">
+      <div class="next-t">What happens next</div>
+      <div class="nx"><i>1</i><span>Tunde Adeyemi is notified now.</span></div>
+      <div class="nx"><i>2</i><span>He compares your figures against the system and accepts, adjusts or queries each line.</span></div>
+      <div class="nx"><i>3</i><span>Whatever he accepts is written to the depot register, with your name on the record.</span></div>
+      <div class="nx"><i>4</i><span>You get a message telling you what was accepted and what was not.</span></div>
+    </div>
+  </div></div>
+  <button class="btn btn-g" onclick="show('menu')">Send something else</button>
+</section>
+
+</main>
+
+<p class="foot">Submitted through a location link for Ibadan Depot.<br>
+Your name, the time and this device are recorded with everything you send.<br>
+<span style="opacity:.7">nothingmissing.ng</span></p>
+
+<script>
+var COPY = {
+  who:['Before we start','Tell us who you are. You only do this once on this phone.'],
+  menu:['What would you like to do?','Anything you send goes to Tunde Adeyemi to check first.'],
+  count:['Stock count','Count what is physically in front of you.'],
+  damage:['Report a fault','Tell your manager what is broken and where.'],
+  done:['Thank you','That has been sent for review.']
+};
+var DONE = {
+  count:['Count sent for review','Your figures are with Tunde Adeyemi. The depot register does not change until he confirms them, and anything that differs from the system will be checked with you first.'],
+  damage:['Fault reported','Tunde Adeyemi has been notified. If he raises a repair, the item is marked out of service so nobody tries to move or use it.']
+};
+function show(id){
+  var steps = document.querySelectorAll('.step');
+  for (var i=0;i<steps.length;i++) steps[i].classList.remove('on');
+  document.getElementById('s-'+id).classList.add('on');
+  document.getElementById('hTitle').textContent = COPY[id][0];
+  document.getElementById('hSub').textContent   = COPY[id][1];
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function saveWho(){
+  var n = document.getElementById('nm').value.replace(/^\s+|\s+$/g,'');
+  var p = document.getElementById('ph').value.replace(/^\s+|\s+$/g,'');
+  if(n.length < 2){ alert('Please enter your name so your manager knows who is counting.'); return; }
+  if(p.length < 7){ alert('Please enter a phone number so we can tell you the outcome.'); return; }
+  document.getElementById('whoN').textContent = n;
+  document.getElementById('who').style.display = 'block';
+  COPY.menu[0] = 'Hello, ' + n.split(' ')[0];
+  show('menu');
+}
+function bump(id, d){
+  var el = document.getElementById(id);
+  var cur = parseInt(el.value, 10);
+  el.value = Math.max(0, (isNaN(cur) ? 0 : cur) + d);
+  count();
+}
+function count(){
+  var ids = ['q1','q2','q3','q4','q5'], n = 0;
+  for (var i=0;i<ids.length;i++){
+    var v = document.getElementById(ids[i]).value.replace(/^\s+|\s+$/g,'');
+    if (v !== '' && !isNaN(parseInt(v,10))) n++;
+  }
+  var b = document.getElementById('cBtn'), l = document.getElementById('cLbl');
+  b.disabled = (n === 0);
+  l.textContent = (n === 0) ? 'Enter at least one count' : 'Send ' + n + ' item' + (n===1?'':'s') + ' for review';
+}
+function finish(kind){
+  document.getElementById('dTitle').textContent = DONE[kind][0];
+  document.getElementById('dBody').textContent  = DONE[kind][1];
+  document.getElementById('dRef').textContent   = 'SUB-2026-' + Math.floor(4000 + Math.random()*5999);
+  show('done');
+}
+</script>
+</body>
+</html>

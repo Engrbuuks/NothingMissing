@@ -1,0 +1,22 @@
+# dependencies and build output
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# secrets — never commit these
+.env
+.env.local
+.env*.local
+*.key
+*.pem
+service-account*.json
+
+# local noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+.vercel

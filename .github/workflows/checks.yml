@@ -1,0 +1,48 @@
+name: checks
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    name: app builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
+          NEXT_PUBLIC_ROOT_DOMAIN: nothingmissing.ng
+
+  database:
+    name: schema, RLS and 271 assertions
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: rebuild, migrate, seed, assert
+        working-directory: backend
+        run: bash scripts/test.sh
+      # Supabase installs pgcrypto in `extensions`, not `public`. A migration
+      # can pass every test above and still fail on deploy without this.
+      - name: migrations against Supabase's extension layout
+        working-directory: backend
+        run: bash scripts/test_supabase_layout.sh
