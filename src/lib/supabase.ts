@@ -20,6 +20,15 @@ import type { CookieOptions } from '@supabase/ssr';
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// Everything lives in the `app` schema, not `public`. PostgREST does not use
+// the database search_path — it needs the schema stated explicitly — so
+// without this every query looks for public.assets and finds nothing.
+//
+// The schema must also be listed under Settings → API → Exposed schemas in
+// Supabase, or PostgREST will refuse to serve it at all. Both are required:
+// this tells the client where to look, that tells the server what to expose.
+const SCHEMA = 'app';
+
 if (!URL || !KEY) {
   // Fail loudly at boot rather than with a confusing 401 on the first query.
   throw new Error(
@@ -29,7 +38,7 @@ if (!URL || !KEY) {
 }
 
 export function browser() {
-  return createBrowserClient(URL, KEY);
+  return createBrowserClient(URL, KEY, { db: { schema: SCHEMA } });
 }
 
 type CookieStore = {
@@ -40,6 +49,7 @@ type CookieStore = {
 /** For server components and route handlers. Pass `cookies()` from next/headers. */
 export function server(cookieStore: CookieStore) {
   return createServerClient(URL, KEY, {
+    db: { schema: SCHEMA },
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (list) => {

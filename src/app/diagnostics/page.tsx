@@ -30,7 +30,11 @@ export default async function Diagnostics() {
     label: 'Schema applied',
     ok: !tableErr || !/does not exist|schema cache/i.test(tableErr.message),
     detail: tableErr
-      ? `${tableErr.message} — run the migrations 0001 to 0010 in order`
+      ? /public\./.test(tableErr.message)
+        // The give-away is "public." in the message: the tables exist, the
+        // client is looking in the wrong schema.
+        ? `${tableErr.message} — this says "public", but everything lives in the "app" schema. Add "app" under Settings → API → Exposed schemas in Supabase.`
+        : `${tableErr.message} — run the migrations 0001 to 0010 in order`
       : 'app.companies is reachable',
   });
 
