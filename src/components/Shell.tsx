@@ -4,6 +4,16 @@ import { getSession, canSeeFinancials, type Session } from '@/lib/session';
 const NAV = [
   { g: 'Menu' },
   { id: 'assets', label: 'Assets', href: '/assets' },
+  { id: 'catalog', label: 'Catalog', href: '/catalog' },
+  { id: 'inventory', label: 'Inventory', href: '/inventory' },
+  { g: 'Movement' },
+  { id: 'transfers', label: 'Transfers', href: '/transfers' },
+  { id: 'requests', label: 'Requests', href: '/requests' },
+  { id: 'submissions', label: 'Field inbox', href: '/submissions' },
+  { g: 'Company' },
+  { id: 'locations', label: 'Locations', href: '/locations' },
+  { id: 'people', label: 'People', href: '/people' },
+  { id: 'audit', label: 'Audit log', href: '/audit' },
   { id: 'diagnostics', label: 'Diagnostics', href: '/diagnostics' },
 ];
 

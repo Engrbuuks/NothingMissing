@@ -38,8 +38,15 @@ export async function middleware(request: NextRequest) {
 
   // Field links stay on the apex with no redirect: a storekeeper on a cheap
   // phone in a warehouse should not pay a round trip to submit a count.
+  //
+  // /l/<token> is the short public URL; the page itself lives at
+  // /field/<token>. A rewrite rather than a redirect, so the address bar keeps
+  // the short form and the token never appears in a Location header.
   if (path.startsWith('/l/')) {
-    return withSession(request, NextResponse.next());
+    const token = path.slice(3);
+    const url = request.nextUrl.clone();
+    url.pathname = `/field/${token}`;
+    return NextResponse.rewrite(url);
   }
 
   const isApex = host === ROOT || host === `www.${ROOT}` || host.endsWith('.vercel.app') || host.startsWith('localhost');
