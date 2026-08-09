@@ -21,6 +21,7 @@ const NAV = [
   { id: 'locations', label: 'Locations', href: '/locations' },
   { id: 'people', label: 'People', href: '/people' },
   { id: 'audit', label: 'Audit log', href: '/audit' },
+  { id: 'settings', label: 'Settings', href: '/settings' },
   { id: 'diagnostics', label: 'Diagnostics', href: '/diagnostics' },
 ];
 

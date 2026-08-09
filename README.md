@@ -211,6 +211,39 @@ identical chairs with no serials are twelve rows that will drift from reality
 within a year. `dispose_asset()` demands evidence per reason, because a theft
 with no reference is exactly the pattern an audit flags.
 
+## The last pieces
+
+| Route | What it does |
+|---|---|
+| `/assets/[id]` | custody timeline, specification, handover, disposal |
+| `/requests/new` | raise a repair or purchase; the chain picks itself |
+| `/settings` | company profile, brand colour, your address |
+
+Plus the three states a product is actually judged on, which were missing:
+
+**`error.tsx`** distinguishes a permission failure from a schema failure from
+everything else, and says something a person can act on. It never shows a raw
+error: a stack trace helps nobody standing in a warehouse, and database
+messages sometimes carry table names we would rather not advertise.
+
+**`loading.tsx`** — with a few thousand assets the register will not paint
+instantly, and a blank screen reads as broken rather than busy.
+
+**First-run.** An empty register now offers to import a spreadsheet rather than
+showing a bare table, because most registers start as one.
+
+**Mobile navigation.** The sidebar was `display:none` under 860px, which left
+no way to navigate at all on a phone. It is now a horizontal strip. Receiving
+and the field page happen in a warehouse, so this was not a nicety.
+
+Verified against a live database:
+
+    requests     NGN 45,000 repair  → manager
+                 NGN 1.45m repair   → admin then owner
+    custody      a handover writes an audit row against the asset
+    settings     an invalid brand colour is refused by the constraint
+    locations    archiving a site holding 4 assets is refused, with the fix in the hint
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

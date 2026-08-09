@@ -80,9 +80,17 @@ export default async function Assets() {
           <div className="empty">
             <h4>Nothing on the register yet</h4>
             <p>
-              Either no assets have been added to this company, or none sit at a location your
-              role covers. Both look the same from here, which is the point — the database
-              decides what you can see, not this page.
+              Either no assets have been added, or none sit at a location your role covers.
+              Both look the same from here, which is the point — the database decides what
+              you can see, not this page.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20, flexWrap: 'wrap' }}>
+              <a className="btn btn-p" href="/import">Import a spreadsheet</a>
+              <a className="btn btn-g" href="/catalog">Set up the catalog first</a>
+            </div>
+            <p style={{ marginTop: 16, fontSize: 12.5 }}>
+              Most registers start as a spreadsheet. Importing one is usually faster than
+              adding assets by hand, and the catalog can be filled in afterwards.
             </p>
           </div>
         </div>
@@ -118,12 +126,12 @@ export default async function Assets() {
                 {rows.map((a) => {
                   const st = STATUS[a.status] ?? STATUS.idle;
                   return (
-                    <tr key={a.id}>
+                    <tr key={a.id} style={{ cursor: 'pointer' }}>
                       <td>
-                        <span className="tag">{a.tag}</span>
+                        <a href={`/assets/${a.id}`} className="tag">{a.tag}</a>
                       </td>
                       <td>
-                        <div className="aname">{a.name}</div>
+                        <a href={`/assets/${a.id}`} className="aname" style={{ display: 'block' }}>{a.name}</a>
                         <div className="amake">
                           {a.models?.brands?.name ? `${a.models.brands.name} · ` : ''}
                           {a.models?.name ?? (a.serial_no ? `Serial ${a.serial_no}` : 'No catalog model')}

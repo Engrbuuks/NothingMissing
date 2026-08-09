@@ -413,3 +413,103 @@ export async function importAssets(formData: FormData): Promise<void> {
   }
   redirect(`/assets?imported=${rows.length}`);
 }
+
+/* ========================================================================== */
+/* Final: asset detail, requests, custody, settings                           */
+/* ========================================================================== */
+
+export async function handOver(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const holder = String(formData.get('holder') ?? '').trim();
+
+  // "Assigned to" should mean a person accepted responsibility, not that
+  // somebody typed a name. Recording the condition at handover is what
+  // settles who damaged something when it comes back.
+  const condition = String(formData.get('condition') ?? '');
+  const { error } = await sb()
+    .from('assets')
+    .update({ holder: holder || null })
+    .eq('id', id);
+
+  revalidatePath(`/assets/${id}`);
+  if (error) redirect(`/assets/${id}?error=` + encodeURIComponent(error.message));
+  redirect(`/assets/${id}?handed=` + encodeURIComponent(condition));
+}
+
+export async function raiseRequest(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const kind = String(formData.get('kind') ?? 'repair');
+  const location = String(formData.get('location') ?? '');
+  const amountRaw = String(formData.get('amount') ?? '').replace(/[^\d]/g, '');
+
+  const { data: loc } = await supabase
+    .from('locations').select('company_id').eq('id', location).maybeSingle();
+  if (!loc) redirect('/requests/new?error=' + encodeURIComponent('That location could not be read.'));
+
+  // The chain is chosen by app.match_policy() from the amount and item count.
+  // Nothing here decides who approves; that is a row in approval_policies.
+  const { error } = await supabase.rpc('raise_request', {
+    p_company: loc.company_id,
+    p_kind: kind,
+    p_title: String(formData.get('title') ?? ''),
+    p_detail: String(formData.get('detail') ?? '') || null,
+    p_location: location,
+    p_asset: String(formData.get('asset') ?? '') || null,
+    p_amount: amountRaw ? Number(amountRaw) * 100 : null,
+    p_items: Number(formData.get('items') ?? 1) || 1,
+  });
+
+  revalidatePath('/requests');
+  if (error) redirect('/requests/new?error=' + encodeURIComponent(error.message));
+  redirect('/requests?raised=1');
+}
+
+export async function updateCompany(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const { error } = await sb()
+    .from('companies')
+    .update({
+      name: String(formData.get('name') ?? ''),
+      registration_no: String(formData.get('rc') ?? '') || null,
+      address: String(formData.get('address') ?? '') || null,
+      phone: String(formData.get('phone') ?? '') || null,
+      brand_hex: String(formData.get('brand') ?? '#5B4BE8'),
+    })
+    .eq('id', id);
+
+  revalidatePath('/settings');
+  if (error) redirect('/settings?error=' + encodeURIComponent(error.message));
+  redirect('/settings?saved=1');
+}
+
+export async function createLocation(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/locations?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.from('locations').insert({
+    company_id: co.id,
+    name: String(formData.get('name') ?? ''),
+    city: String(formData.get('city') ?? '') || null,
+    kind: 'physical',
+  });
+
+  revalidatePath('/locations');
+  if (error) redirect('/locations?error=' + encodeURIComponent(error.message));
+  redirect('/locations?added=1');
+}
+
+export async function archiveLocation(id: string): Promise<void> {
+  // Locations archive, never delete: waybills and audit rows reference them by
+  // id, and dropping the row would turn every one into a dangling pointer.
+  const { error } = await sb().rpc('archive_location', { p_location: id });
+  revalidatePath('/locations');
+  if (error) redirect('/locations?error=' + encodeURIComponent(error.message));
+}
+
+export async function sweepLocation(id: string): Promise<void> {
+  const { error } = await sb().rpc('sweep_location', { p_location: id });
+  revalidatePath('/locations');
+  if (error) redirect('/locations?error=' + encodeURIComponent(error.message));
+  redirect('/locations?swept=1');
+}
