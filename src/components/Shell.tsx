@@ -2,14 +2,21 @@ import { redirect } from 'next/navigation';
 import { getSession, canSeeFinancials, type Session } from '@/lib/session';
 
 const NAV = [
-  { g: 'Menu' },
+  { g: 'Register' },
   { id: 'assets', label: 'Assets', href: '/assets' },
   { id: 'catalog', label: 'Catalog', href: '/catalog' },
   { id: 'inventory', label: 'Inventory', href: '/inventory' },
+  { id: 'import', label: 'Import', href: '/import' },
   { g: 'Movement' },
   { id: 'transfers', label: 'Transfers', href: '/transfers' },
+  { id: 'discrepancies', label: 'Discrepancies', href: '/discrepancies' },
   { id: 'requests', label: 'Requests', href: '/requests' },
   { id: 'submissions', label: 'Field inbox', href: '/submissions' },
+  { g: 'Lifecycle' },
+  { id: 'maintenance', label: 'Maintenance', href: '/maintenance' },
+  { id: 'purchase-orders', label: 'Purchase orders', href: '/purchase-orders' },
+  { id: 'suppliers', label: 'Suppliers', href: '/suppliers' },
+  { id: 'reports', label: 'Reports', href: '/reports' },
   { g: 'Company' },
   { id: 'locations', label: 'Locations', href: '/locations' },
   { id: 'people', label: 'People', href: '/people' },

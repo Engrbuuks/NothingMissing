@@ -106,6 +106,7 @@ export async function acceptTransfer(formData: FormData): Promise<void> {
 
   revalidatePath(`/transfers/${id}`);
   revalidatePath('/transfers');
+  revalidatePath('/discrepancies');
   revalidatePath('/assets');
 
   if (error) redirect(`/transfers/${id}?error=` + encodeURIComponent(error.message));
@@ -257,4 +258,158 @@ export async function decideRequest(formData: FormData): Promise<void> {
   });
   revalidatePath('/requests');
   if (error) redirect('/requests?error=' + encodeURIComponent(error.message));
+}
+
+/* ========================================================================== */
+/* Build B: lifecycle, procurement and reporting                              */
+/* ========================================================================== */
+
+export async function disposeAsset(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const reason = String(formData.get('reason') ?? '');
+  const proceeds = String(formData.get('proceeds') ?? '').replace(/[^\d]/g, '');
+  const evidence = String(formData.get('evidence') ?? '');
+  const note = String(formData.get('note') ?? '');
+
+  // The evidence rules live in app.dispose_asset(), not here. A theft with no
+  // police reference is exactly the pattern an audit flags, so it is refused
+  // by the database rather than by a form that could be bypassed.
+  const { error } = await sb().rpc('dispose_asset', {
+    p_asset: id,
+    p_reason: reason,
+    p_proceeds: proceeds ? Number(proceeds) * 100 : null,
+    p_evidence: evidence || null,
+    p_note: note || null,
+  });
+
+  revalidatePath('/assets');
+  if (error) redirect(`/assets/${id}?error=` + encodeURIComponent(error.message));
+  redirect('/assets?disposed=1');
+}
+
+export async function returnToService(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const outcome = String(formData.get('outcome') ?? '');
+  const cost = String(formData.get('cost') ?? '').replace(/[^\d]/g, '');
+
+  const { error } = await sb().rpc('return_to_service', {
+    p_asset: id,
+    p_outcome: outcome,
+    p_cost: cost ? Number(cost) * 100 : null,
+    p_note: (formData.get('note') as string) || null,
+  });
+
+  revalidatePath('/maintenance');
+  revalidatePath('/assets');
+  if (error) redirect('/maintenance?error=' + encodeURIComponent(error.message));
+  redirect('/maintenance?returned=1');
+}
+
+export async function receiveGoods(formData: FormData): Promise<void> {
+  const po = String(formData.get('po') ?? '');
+
+  // Serials arrive as serial_<lineNo>_<index>. Grouping them by line matters:
+  // receive_goods() refuses a serialised line whose serial count does not
+  // match its quantity, which is the rule that stops twelve identical chairs
+  // becoming twelve rows nobody can ever tell apart.
+  const byLine: Record<string, string[]> = {};
+  for (const [k, v] of formData.entries()) {
+    if (!k.startsWith('serial_')) continue;
+    const [, line] = k.split('_');
+    const val = String(v).trim();
+    if (!val) continue;
+    (byLine[line] ??= []).push(val);
+  }
+
+  const payload = Object.entries(byLine).map(([line_no, serials]) => ({
+    line_no: Number(line_no),
+    serials,
+  }));
+
+  const { error } = await sb().rpc('receive_goods', {
+    p_po: po,
+    p_serials: payload,
+    p_note: (formData.get('note') as string) || null,
+  });
+
+  revalidatePath('/purchase-orders');
+  revalidatePath('/assets');
+  if (error) redirect(`/purchase-orders/${po}?error=` + encodeURIComponent(error.message));
+  redirect(`/purchase-orders/${po}?received=1`);
+}
+
+export async function createSupplier(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).single();
+  if (!co) redirect('/suppliers?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.from('suppliers').insert({
+    company_id: co.id,
+    name: String(formData.get('name') ?? ''),
+    email: String(formData.get('email') ?? '') || null,
+    phone: String(formData.get('phone') ?? '') || null,
+    supplies: String(formData.get('supplies') ?? '') || null,
+  });
+
+  revalidatePath('/suppliers');
+  if (error) redirect('/suppliers?error=' + encodeURIComponent(error.message));
+  redirect('/suppliers?added=1');
+}
+
+export async function importAssets(formData: FormData): Promise<void> {
+  const raw = String(formData.get('csv') ?? '').trim();
+  const location = String(formData.get('location') ?? '');
+  if (!raw || !location) {
+    redirect('/import?error=' + encodeURIComponent('Paste some rows and choose a location.'));
+  }
+
+  const supabase = sb();
+  const { data: loc } = await supabase
+    .from('locations')
+    .select('id, company_id')
+    .eq('id', location)
+    .single();
+  if (!loc) redirect('/import?error=' + encodeURIComponent('That location could not be read.'));
+
+  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const idx = (name: string) => header.indexOf(name);
+  const iTag = idx('tag');
+  const iName = idx('name');
+  const iSerial = idx('serial');
+
+  if (iTag < 0 || iName < 0) {
+    redirect(
+      '/import?error=' +
+        encodeURIComponent('The first row must name the columns, and must include tag and name.')
+    );
+  }
+
+  const rows = lines.slice(1).map((l) => {
+    const c = l.split(',').map((x) => x.trim());
+    return {
+      company_id: loc.company_id,
+      location_id: loc.id,
+      tag: c[iTag],
+      name: c[iName],
+      serial_no: iSerial >= 0 ? c[iSerial] || null : null,
+      status: 'active' as const,
+    };
+  });
+
+  // Insert as one statement so a duplicate tag or serial anywhere rejects the
+  // whole batch. A half-imported register is worse than none: you cannot tell
+  // which rows are real without re-reading the spreadsheet line by line.
+  const { error } = await supabase.from('assets').insert(rows);
+
+  revalidatePath('/assets');
+  if (error) {
+    redirect(
+      '/import?error=' +
+        encodeURIComponent(
+          `${error.message} — nothing was imported. Fix the row and paste again.`
+        )
+    );
+  }
+  redirect(`/assets?imported=${rows.length}`);
 }

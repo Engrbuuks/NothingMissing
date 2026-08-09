@@ -184,6 +184,33 @@ everything it can do lands as a pending row a manager reviews. A leaked link
 means somebody submitted a wrong count, not that somebody moved your
 generators.
 
+## Build B — lifecycle, procurement and reporting
+
+| Route | What it does |
+|---|---|
+| `/import` | paste a spreadsheet; the batch is all or nothing |
+| `/maintenance` | what is due, from the model's interval; return to service |
+| `/purchase-orders` | ordering, and goods receipt with serial capture |
+| `/suppliers` | lead time computed from your own orders, not from a promise |
+| `/discrepancies` | assets belonging to neither register, with three exits |
+| `/reports` | depreciation, book value, disposals and losses |
+
+Verified against a live database:
+
+    goods receipt   3 units with 2 serials — refused outright
+                    3 units with 3 serials — 3 assets created
+    lead time       9.0 days, computed from issue and receipt timestamps
+    disposal        theft with no police reference — refused
+                    sale with no proceeds — refused
+                    sale below book value — NGN 292,000 loss recorded
+    maintenance     scheduled from the catalog model, not per asset
+
+The rules live in the database, not in the forms. `receive_goods()` refuses a
+serialised line whose serial count does not match its quantity, because twelve
+identical chairs with no serials are twelve rows that will drift from reality
+within a year. `dispose_asset()` demands evidence per reason, because a theft
+with no reference is exactly the pattern an audit flags.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,
