@@ -90,7 +90,7 @@ decisions — membership-based tenancy, USING paired with WITH CHECK on every
 write policy, purchase cost behind its own table, an append-only audit log, and
 the atomic transfer acceptance.
 
-To set up a real project: run migrations `0001` through `0010` in order in the
+To set up a real project: run migrations `0001` through `0011` in order in the
 Supabase SQL editor, then `bootstrap.sql` once. Do **not** run
 `supabase/seed.sql` — those are test fixtures for two fictional companies.
 
@@ -169,6 +169,20 @@ Verified against a live database:
     after accepting 3910 written as a count_adjust movement of exactly -90
     requests        an 8-asset transfer matched the two-step policy: manager then admin
     anon access     permission denied on assets, stock, companies, submissions, links
+
+## A bug worth recording
+
+`issue_location_link()` originally returned `/l/<slug>#<token>`. Putting the
+token in a fragment keeps it out of server logs, proxy logs and Referer
+headers — a good instinct, and wrong here. A fragment is never sent to the
+server, so a server-rendered page receives the slug and no token, and every
+link resolved to nothing. The user saw "this link is no longer valid".
+
+Migration `0011` moves the token into the path. What makes that acceptable is
+that the token is not a session: it grants no read access to anything, and
+everything it can do lands as a pending row a manager reviews. A leaked link
+means somebody submitted a wrong count, not that somebody moved your
+generators.
 
 ## Status
 

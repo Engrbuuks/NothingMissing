@@ -60,7 +60,14 @@ export default async function Field({
       <main style={{ maxWidth: 520, margin: '0 auto', padding: '60px 20px' }}>
         <h1 style={{ fontSize: 22 }}>This link is no longer valid</h1>
         <p style={{ color: 'var(--text-2)', marginTop: 12, lineHeight: 1.65 }}>
-          It may have expired, been revoked, or reached its limit. Ask your manager for a new one.
+          It may have expired, been revoked, reached its monthly limit, or been copied
+          incompletely. Ask your manager for a new one.
+        </p>
+        <p style={{ color: 'var(--text-3)', marginTop: 14, fontSize: 12.5, lineHeight: 1.6 }}>
+          {/* Deliberately vague to the visitor: telling someone which of the four
+              it is lets them probe for valid tokens. The audit log records every
+              attempt, so a manager can see what actually happened. */}
+          If you copied this address by hand, check nothing was cut off the end.
         </p>
       </main>
     );
