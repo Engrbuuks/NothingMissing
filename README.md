@@ -246,21 +246,25 @@ Verified against a live database:
 
 ## The dashboard
 
-Signing in lands here, not on the register. Three bands, in the order the
-questions actually arrive:
+Built to the prototype rather than reinterpreted from it. Five bands: the dark
+hero with its bloom, what needs you, your assets, movement volume, and what is
+moving.
 
-1. **What needs you today** — awaiting approval, field submissions, consignments
-   in transit, open discrepancies. Actions, not metrics: this is why someone
-   opens the app in the morning, so it sits above anything decorative.
-2. **What you have** — the estate as a proportional bar by status, then a
-   breakdown by category. The shape of the register is the thing worth seeing
-   at a glance, not five separate numbers.
-3. **What is moving** — consignments with an ageing clock, and recent activity
-   straight from the audit log.
+The charts are hand-drawn SVG in `src/lib/charts.ts` — a smoothed sparkline and
+a segmented donut, each a few lines of path maths. No charting library: one
+would add 40kb to every page load, impose its own visual language, and still
+need overriding to match the design. They are pure functions returning strings,
+so they render on the server with no client JavaScript.
 
 Every figure is a live count scoped by row-level security. Nothing is cached,
-so nothing can drift. A brand new company gets a first-run screen offering to
-import a spreadsheet rather than a wall of zeroes that reads as broken.
+so nothing can drift from the register. A brand new company gets a first-run
+screen offering to import a spreadsheet rather than a wall of zeroes.
+
+**The stylesheet is copied from the prototype as one substring**, deliberately.
+An earlier attempt extracted it rule by rule with a regex, which lifted every
+mobile override out of its `@media` wrapper and applied it at all widths — so a
+1440px screen wore 22px padding meant for a phone, and the hero lost its 26px
+radius. Verified identical to the prototype at 1440px, 1100px and 390px.
 
 ## Notifications
 
