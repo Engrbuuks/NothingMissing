@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { getSession, canSeeFinancials, type Session } from '@/lib/session';
 
 const NAV = [
+  { g: 'Overview' },
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
   { g: 'Register' },
   { id: 'assets', label: 'Assets', href: '/assets' },
   { id: 'catalog', label: 'Catalog', href: '/catalog' },
@@ -21,6 +23,7 @@ const NAV = [
   { id: 'locations', label: 'Locations', href: '/locations' },
   { id: 'people', label: 'People', href: '/people' },
   { id: 'audit', label: 'Audit log', href: '/audit' },
+  { id: 'notifications', label: 'Notifications', href: '/notifications' },
   { id: 'settings', label: 'Settings', href: '/settings' },
   { id: 'diagnostics', label: 'Diagnostics', href: '/diagnostics' },
 ];

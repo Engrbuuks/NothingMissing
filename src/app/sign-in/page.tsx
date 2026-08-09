@@ -33,7 +33,7 @@ export default function SignIn() {
 
     // A full reload rather than a client transition: the session cookie was
     // just written, and the server needs to see it on the next request.
-    window.location.href = '/assets';
+    window.location.href = '/dashboard';
   }
 
   return (

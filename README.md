@@ -244,6 +244,40 @@ Verified against a live database:
     settings     an invalid brand colour is refused by the constraint
     locations    archiving a site holding 4 assets is refused, with the fix in the hint
 
+## The dashboard
+
+Signing in lands here, not on the register. Three bands, in the order the
+questions actually arrive:
+
+1. **What needs you today** — awaiting approval, field submissions, consignments
+   in transit, open discrepancies. Actions, not metrics: this is why someone
+   opens the app in the morning, so it sits above anything decorative.
+2. **What you have** — the estate as a proportional bar by status, then a
+   breakdown by category. The shape of the register is the thing worth seeing
+   at a glance, not five separate numbers.
+3. **What is moving** — consignments with an ageing clock, and recent activity
+   straight from the audit log.
+
+Every figure is a live count scoped by row-level security. Nothing is cached,
+so nothing can drift. A brand new company gets a first-run screen offering to
+import a spreadsheet rather than a wall of zeroes that reads as broken.
+
+## Notifications
+
+Migration `0013` adds a queue. Nothing sends yet, and that is deliberate:
+half-built notifications reaching real people is worse than none, and a queued
+row you can read beats a fire-and-forget call you cannot.
+
+Everything the system would send is written to `app.notifications` and shown at
+`/notifications`, so you can see exactly what would go out — and to whom —
+before wiring a provider and discovering it in your customers' inboxes. Doing
+so is a few lines in `src/lib/notify.ts`.
+
+Channel is a per-event choice, because field staff on location links have a
+phone number and often no work email. Discrepancy alerts are locked on: they
+are the safety net on the register, and a company that silences them discovers
+its own losses months late.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,
