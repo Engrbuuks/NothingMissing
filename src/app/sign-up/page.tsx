@@ -1,5 +1,7 @@
 'use client';
 
+import { Wordmark } from '@/components/Mark';
+
 import { useState } from 'react';
 import { browser } from '@/lib/supabase';
 
@@ -57,7 +59,7 @@ export default function SignUp() {
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
-        <div className="brand-mark" style={{ width: 44, height: 44, borderRadius: 14, fontSize: 15, marginBottom: 22 }}>NM</div>
+        <Wordmark size={24} tagline />
         <h1 style={{ fontSize: 25 }}>Create an account</h1>
         <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 7 }}>
           Free while you set it up. No card.

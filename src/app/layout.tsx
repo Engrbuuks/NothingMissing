@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/favicon.png',
+    apple: '/brand/mark-180.png',
+  },
   title: 'Nothing Missing',
   description:
     'Asset and inventory management for companies running depots, branches and site offices.',

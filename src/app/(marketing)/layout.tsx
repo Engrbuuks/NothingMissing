@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Wordmark, Mark } from '@/components/Mark';
 
 /**
  * The marketing site, on the apex. A tenant lives at its own subdomain, so
@@ -10,9 +10,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
     <div className="mkt">
       <header className="mkt-nav">
         <div className="mkt-wrap">
-          <a className="mkt-brand" href="/">
-            <span className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10, fontSize: 12 }}>NM</span>
-            <span>Nothing Missing</span>
+          <a className="mkt-brand" href="/" aria-label="Nothing Missing">
+            <Wordmark size={19} />
           </a>
           <nav className="mkt-links">
             <a href="/pricing">Pricing</a>
@@ -31,9 +30,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <footer className="mkt-foot">
         <div className="mkt-wrap">
           <div>
-            <div className="mkt-brand" style={{ marginBottom: 10 }}>
-              <span className="brand-mark" style={{ width: 30, height: 30, borderRadius: 9, fontSize: 11 }}>NM</span>
-              <span>Nothing Missing</span>
+            <div style={{ marginBottom: 12 }}>
+              <Wordmark size={18} />
             </div>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', maxWidth: 260, lineHeight: 1.6 }}>
               Asset and inventory management for companies running depots, branches and site

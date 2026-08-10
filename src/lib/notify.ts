@@ -52,8 +52,34 @@ export async function notify(m: Message): Promise<void> {
 
   if (!row) return;
 
-  if (m.channel !== 'email' || !process.env.RESEND_API_KEY) return;
+  const result =
+    m.channel === 'email' ? await sendEmail(m) : await sendTermii(m);
 
+  await supabase
+    .from('notifications')
+    .update(
+      result.sent
+        ? {
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            provider: result.provider,
+            provider_id: result.id ?? null,
+          }
+        : result.skipped
+          ? { provider: result.provider }   // still queued, no key configured
+          : { status: 'failed', error: result.error?.slice(0, 300), attempts: 1,
+              provider: result.provider }
+    )
+    .eq('id', row.id);
+}
+
+type Sent =
+  | { sent: true; provider: string; id?: string }
+  | { sent: false; skipped: true; provider: string }
+  | { sent: false; skipped?: false; provider: string; error: string };
+
+async function sendEmail(m: Message): Promise<Sent> {
+  if (!process.env.RESEND_API_KEY) return { sent: false, skipped: true, provider: 'resend' };
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -62,27 +88,68 @@ export async function notify(m: Message): Promise<void> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: FROM,
-        to: [m.recipient],
-        subject: m.subject,
-        html: wrap(m.subject, m.body),
+        from: FROM, to: [m.recipient], subject: m.subject, html: wrap(m.subject, m.body),
       }),
     });
-
-    await supabase
-      .from('notifications')
-      .update(
-        res.ok
-          ? { status: 'sent', sent_at: new Date().toISOString() }
-          : { status: 'failed', error: `HTTP ${res.status}`, attempts: 1 }
-      )
-      .eq('id', row.id);
+    const body = await res.json().catch(() => ({}));
+    return res.ok
+      ? { sent: true, provider: 'resend', id: body?.id }
+      : { sent: false, provider: 'resend', error: body?.message ?? `HTTP ${res.status}` };
   } catch (e) {
-    await supabase
-      .from('notifications')
-      .update({ status: 'failed', error: String(e).slice(0, 300), attempts: 1 })
-      .eq('id', row.id);
+    return { sent: false, provider: 'resend', error: String(e) };
   }
+}
+
+/**
+ * SMS and WhatsApp through Termii, which is the practical choice for Nigerian
+ * numbers — international providers route poorly to MTN and Glo, and delivery
+ * rates matter more than API elegance when the message is "your delivery is
+ * three days overdue".
+ *
+ * Messages are truncated to 300 characters. An SMS beyond 160 is billed as
+ * several, and a notification that costs four segments is a notification
+ * somebody will eventually switch off.
+ */
+async function sendTermii(m: Message): Promise<Sent> {
+  const key = process.env.TERMII_API_KEY;
+  if (!key) return { sent: false, skipped: true, provider: 'termii' };
+
+  const to = normaliseNigerianNumber(m.recipient);
+  if (!to) return { sent: false, provider: 'termii', error: 'Not a usable phone number' };
+
+  try {
+    const res = await fetch('https://api.ng.termii.com/api/sms/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        to,
+        from: process.env.TERMII_SENDER_ID ?? 'NothingMissing',
+        sms: `${m.subject}\n\n${m.body}`.slice(0, 300),
+        type: 'plain',
+        channel: m.channel === 'whatsapp' ? 'whatsapp' : 'generic',
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return res.ok && body?.message_id
+      ? { sent: true, provider: 'termii', id: String(body.message_id) }
+      : { sent: false, provider: 'termii', error: body?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { sent: false, provider: 'termii', error: String(e) };
+  }
+}
+
+/**
+ * Nigerian numbers arrive in every shape a person might type: 08031234567,
+ * +2348031234567, 2348031234567, 803 123 4567. Termii wants 234 followed by
+ * ten digits. Getting this wrong means messages that silently go nowhere.
+ */
+export function normaliseNigerianNumber(input: string): string | null {
+  const d = (input ?? '').replace(/\D/g, '');
+  if (/^234\d{10}$/.test(d)) return d;              // already international
+  if (/^0\d{10}$/.test(d)) return '234' + d.slice(1); // 0803...
+  if (/^\d{10}$/.test(d)) return '234' + d;          // 803... with no zero
+  return null;
 }
 
 /** Who should hear about an event, honouring the company's preferences. */

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { Wordmark } from '@/components/Mark';
 import { getSession, sb } from '@/lib/session';
 import { createCompanyAccount } from '@/lib/actions';
 
@@ -23,7 +24,7 @@ export default async function Onboarding({
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
-        <div className="brand-mark" style={{ width: 44, height: 44, borderRadius: 14, fontSize: 15, marginBottom: 22 }}>NM</div>
+        <Wordmark size={24} tagline />
         <h1 style={{ fontSize: 25 }}>Name your company</h1>
         <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 7, lineHeight: 1.6 }}>
           This creates your register, your virtual warehouse, and the address your team

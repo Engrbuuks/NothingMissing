@@ -29,8 +29,17 @@ export type Tenant = {
   slug: string;
   name: string;
   brand_hex: string;
+  accent_hex: string | null;
+  theme_mode: 'light' | 'dark';
   logo_path: string | null;
 };
+
+/** Public URL for a company logo in the `branding` bucket. */
+export function logoUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return base ? `${base}/storage/v1/object/public/branding/${path}` : null;
+}
 
 export type Session = {
   userId: string;
@@ -65,7 +74,9 @@ export async function currentTenant(): Promise<Tenant | null> {
     id: data.tenant,
     slug: data.slug,
     name: data.name,
-    brand_hex: data.brand_hex ?? '#5B4BE8',
+    brand_hex: data.brand_hex ?? '#0551BD',
+    accent_hex: data.accent_hex ?? null,
+    theme_mode: (data.theme_mode ?? 'light') as 'light' | 'dark',
     logo_path: data.logo_path ?? null,
   };
 }

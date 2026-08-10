@@ -747,3 +747,224 @@ export async function closeCompany(formData: FormData): Promise<void> {
   if (error) redirect('/settings?error=' + encodeURIComponent(error.message));
   redirect('/auth/sign-out');
 }
+
+/**
+ * Starting a payment.
+ *
+ * The amount is computed by the database from the register, never taken from
+ * the form — a client-supplied amount is a client-supplied discount.
+ */
+export async function startPayment(): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/billing?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data: begun, error } = await supabase.rpc('begin_payment', { p_company: co.id });
+  if (error) redirect('/billing?error=' + encodeURIComponent(error.message));
+
+  const { initializeTransaction, paystackConfigured } = await import('./paystack');
+  if (!paystackConfigured()) {
+    redirect('/billing?error=' + encodeURIComponent(
+      'Payments are not connected yet. Email us and we will invoice you directly.'));
+  }
+
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
+  const result = await initializeTransaction({
+    email: (begun as any).email,
+    amountMinor: (begun as any).amount_minor,
+    reference: (begun as any).reference,
+    companyId: co.id,
+    callbackUrl: `https://${root}/billing?returned=1`,
+  });
+
+  if (!result.ok) redirect('/billing?error=' + encodeURIComponent(result.error));
+  redirect(result.authorization_url);
+}
+
+/**
+ * Recording a bank transfer.
+ *
+ * The receipt is uploaded to storage and a claim row is created. Nothing is
+ * activated by this — a doctored image must not buy service, so confirmation
+ * happens against the actual bank statement, by a person, in /admin/claims.
+ */
+export async function submitTransferReceipt(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/billing?error=' + encodeURIComponent('No company in scope.'));
+
+  const file = formData.get('receipt') as File | null;
+  let path: string | null = null;
+  let name: string | null = null;
+  let mime: string | null = null;
+  let bytes: number | null = null;
+
+  if (file && file.size > 0) {
+    if (file.size > 10 * 1024 * 1024) {
+      redirect('/billing?error=' + encodeURIComponent('That file is over 10 MB. A photo of the alert is enough.'));
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
+    if (!allowed.includes(file.type)) {
+      redirect('/billing?error=' + encodeURIComponent('Upload a photo or a PDF of the transfer receipt.'));
+    }
+
+    const { data: keyed } = await supabase.rpc('receipt_path', {
+      p_company: co.id, p_file: file.name,
+    });
+    const key = String(keyed);
+
+    const { error: upErr } = await supabase.storage
+      .from('receipts')
+      .upload(key, file, { contentType: file.type, upsert: false });
+
+    if (upErr) {
+      redirect('/billing?error=' + encodeURIComponent(
+        `Could not store the receipt: ${upErr.message}. The transfer itself is unaffected — try again or email it to us.`));
+    }
+
+    path = key; name = file.name; mime = file.type; bytes = file.size;
+  }
+
+  const { error } = await supabase.rpc('submit_transfer_claim', {
+    p_company: co.id,
+    p_paid_on: String(formData.get('paid_on') ?? ''),
+    p_bank_from: String(formData.get('bank_from') ?? '') || null,
+    p_narration: String(formData.get('narration') ?? '') || null,
+    p_note: String(formData.get('note') ?? '') || null,
+    p_receipt_path: path,
+    p_receipt_name: name,
+    p_receipt_mime: mime,
+    p_receipt_bytes: bytes,
+  });
+
+  revalidatePath('/billing');
+  if (error) redirect('/billing?error=' + encodeURIComponent(error.message));
+  redirect('/billing?submitted=1');
+}
+
+export async function reviewClaim(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const confirm = String(formData.get('decision') ?? '') === 'confirm';
+  const actual = String(formData.get('actual') ?? '').replace(/[^\d]/g, '');
+
+  const { error } = await sb().rpc('review_transfer_claim', {
+    p_claim: id,
+    p_confirm: confirm,
+    p_note: String(formData.get('note') ?? '') || null,
+    p_actual_minor: actual ? Number(actual) * 100 : null,
+  });
+
+  revalidatePath('/admin/claims');
+  redirect(error ? `/admin/claims?error=${encodeURIComponent(error.message)}` : '/admin/claims?done=1');
+}
+
+/**
+ * Recording a bank transfer.
+ *
+ * The receipt is uploaded to storage from the browser before this runs, so a
+ * large image never passes through a server action — and the path is namespaced
+ * by company, so a bucket policy can enforce the same separation the database
+ * does.
+ */
+export async function submitPaymentProof(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/billing?error=' + encodeURIComponent('No company in scope.'));
+
+  const naira = String(formData.get('amount') ?? '').replace(/[^\d]/g, '');
+  if (!naira) redirect('/billing/transfer?error=' + encodeURIComponent('Enter the amount you sent.'));
+
+  const { error } = await supabase.rpc('submit_payment_proof', {
+    p_company: co.id,
+    p_amount: Number(naira) * 100,
+    p_paid_on: String(formData.get('paid_on') ?? ''),
+    p_bank: String(formData.get('bank') ?? '') || null,
+    p_sender: String(formData.get('sender') ?? '') || null,
+    p_narration: String(formData.get('narration') ?? '') || null,
+    p_receipt_path: String(formData.get('receipt_path') ?? '') || null,
+    p_receipt_name: String(formData.get('receipt_name') ?? '') || null,
+  });
+
+  revalidatePath('/billing');
+  if (error) redirect('/billing/transfer?error=' + encodeURIComponent(error.message));
+  redirect('/billing?recorded=1');
+}
+
+export async function reviewPaymentProof(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('verify_payment_proof', {
+    p_id: String(formData.get('id') ?? ''),
+    p_approve: String(formData.get('decision') ?? '') === 'approve',
+    p_note: String(formData.get('note') ?? '') || null,
+  });
+  revalidatePath('/admin/payments');
+  redirect(error ? `/admin/payments?error=${encodeURIComponent(error.message)}` : '/admin/payments?done=1');
+}
+
+export async function savePlatformSettings(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('update_platform_settings', {
+    p_bank: String(formData.get('bank') ?? ''),
+    p_account_name: String(formData.get('account_name') ?? ''),
+    p_account_number: String(formData.get('account_number') ?? ''),
+    p_instructions: String(formData.get('instructions') ?? ''),
+  });
+  revalidatePath('/admin/payments');
+  revalidatePath('/billing/transfer');
+  redirect(error ? `/admin/payments?error=${encodeURIComponent(error.message)}` : '/admin/payments?saved=1');
+}
+
+export async function saveTheme(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('set_company_theme', {
+    p_company: co.id,
+    p_brand: String(formData.get('brand') ?? '') || null,
+    p_accent: String(formData.get('accent') ?? '') || null,
+    p_mode: String(formData.get('mode') ?? '') || null,
+    p_footer: String(formData.get('footer') ?? '') || null,
+    p_show_logo: formData.get('show_logo') === 'on',
+  });
+
+  revalidatePath('/settings');
+  redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
+}
+
+export async function saveLogo(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('set_company_logo', {
+    p_company: co.id,
+    p_path: String(formData.get('logo_path') ?? '') || null,
+  });
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
+}
+
+export async function saveViewPreferences(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
+
+  const columns = formData.getAll('column').map(String);
+  const loc = String(formData.get('default_location') ?? '');
+
+  const { error } = await supabase.rpc('save_view_preferences', {
+    p_company: co.id,
+    p_landing: String(formData.get('landing') ?? '') || null,
+    p_density: String(formData.get('density') ?? '') || null,
+    p_columns: columns,
+    // The sentinel is how "all locations" is told apart from "no change" —
+    // a null here would mean the latter.
+    p_location: loc || '00000000-0000-0000-0000-000000000000',
+    p_hide_retired: formData.get('hide_retired') === 'on',
+  });
+
+  revalidatePath('/settings');
+  revalidatePath('/assets');
+  redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
+}

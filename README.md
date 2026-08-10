@@ -485,6 +485,124 @@ if they ask for removal. That log is the basis of somebody else's asset
 register, the company is its controller, and we cannot erase it on an
 individual's request.
 
+## Payments (0018)
+
+Two details about Paystack webhooks are easy to get wrong and expensive to get
+wrong quietly, so both are handled explicitly.
+
+**The signature is HMAC-SHA512, not SHA-256**, computed over the **raw request
+body**. Hashing a re-serialised object works right up until a key order or a
+unicode escape differs, at which point valid payments start being rejected for
+no visible reason. Verified against eleven cases including a tampered amount, a
+SHA-256 signature, a truncated one, and a re-serialised body — all rejected;
+unicode bodies verify.
+
+**Paystack retries for 72 hours**, so every event will arrive more than once.
+Each is recorded by its Paystack id before anything is acted on, and the unique
+index makes a duplicate a no-op. Verified: applying the same payment twice
+reports `already applied` and changes nothing.
+
+The webhook — not the browser redirect — is the authoritative signal. A
+customer whose network drops after paying still gets what they paid for.
+
+The amount is computed by the database from the register, never taken from the
+form: a client-supplied amount is a client-supplied discount. A charge that
+does not match what was owed marks the payment failed and writes a `bad`-toned
+audit row rather than reconciling quietly.
+
+The service role key is used in exactly one file, where there is no session
+because the caller is Paystack and the proof is the signature.
+
+## SMS and WhatsApp
+
+Through Termii. International providers route poorly to MTN and Glo, and
+delivery rate matters more than API elegance when the message is "your delivery
+is three days overdue".
+
+Nigerian numbers arrive in every shape a person might type — `08031234567`,
+`+234 803 123 4567`, `8031234567` — and Termii wants `234` plus ten digits.
+Getting that wrong means messages that silently go nowhere, so normalisation is
+unit-tested across eleven inputs including a UK number, which correctly returns
+nothing rather than being mangled into a Nigerian one.
+
+Messages truncate at 300 characters: an SMS past 160 is billed as several, and
+a notification costing four segments is one somebody eventually switches off.
+
+## Paying by bank transfer (0019)
+
+Paystack approval takes weeks in Nigeria, and bank transfer is how most B2B
+actually pays anyway. A company sees the account details, transfers, uploads a
+receipt, and somebody at our end confirms it.
+
+**The awkward part is honest about itself.** Everything else in this system is
+tenant-scoped — a query returns one company's rows because the database will
+not return any others. Verifying a payment is inherently cross-tenant, because
+the person confirming works for us rather than for the customer.
+
+Rather than a superuser role, there is a **platform reviewer** who can see
+exactly one thing: payment submissions, with the company name, the amount, the
+reference and the receipt. Verified: a reviewer sees the queue and still reads
+**zero** assets and **zero** audit rows from a company they are not in. The
+guarantee on the security page stays true because the exception is one table
+wide.
+
+It is also audited from the customer's side. Confirming a transfer writes a row
+into **that company's own log**, naming the reviewer:
+
+    a transfer was confirmed — NGN 11,700 confirmed by Grace Aluko at
+    Nothing Missing — paid up to 2026-10-10
+
+If we can reach into a company, the company gets to see that we did.
+
+Becoming a reviewer is a manual `insert` with no screen behind it, because a
+button that grants cross-tenant visibility is a button somebody eventually
+clicks by mistake.
+
+Receipts upload from the browser straight to storage — a 5 MB photograph of a
+bank slip has no business travelling through a server action — and are served
+to reviewers through a two-minute signed URL rather than a public path. Bucket
+policies are in `backend/STORAGE.md`, and they restate the same rule the
+database applies, because the browser uploads directly and never passes through
+our server.
+
+## Brand and theming (0020)
+
+The mark — the n and m with an open crate between them whose lid reads as a
+tick — is drawn as SVG in `src/components/Mark.tsx` rather than shipped as a
+PNG. It stays crisp at 26px in a sidebar and 200px on a document, and it can
+carry a colour. The rasters in `public/brand` exist for email, which cannot be
+trusted with inline SVG.
+
+Colours were taken from the logo file rather than guessed: navy `#061F3E`,
+blue `#0551BD`, crate face `#085ED5`. They are now the palette defaults.
+
+**Two kinds of setting, kept apart deliberately.**
+
+*Company theme* is one person's decision applied to everyone — colour, logo,
+what prints on a waybill. Owner or admin only.
+
+*View preferences* are personal — landing page, table density, which columns
+the register shows, a default location. A manager checking deliveries all day
+and an owner reading reports want different defaults, and neither should be
+able to impose theirs on the other. The policy is `user_id = auth.uid()` in
+both directions: an owner cannot read what a manager prefers, because it is not
+their business and a preference table is not a surveillance tool.
+
+**One colour, and everything derives from it.** Handing someone six pickers
+produces documents with their name on them that they would be embarrassed to
+send. A custom colour is allowed, but `set_company_theme()` computes relative
+luminance and refuses anything too pale to carry white text — otherwise the
+first they hear of an unreadable waybill is a customer complaining.
+
+**A company's logo replaces ours in their sidebar and on their waybills.** A
+document going to a checkpoint should carry their identity, not ours. The
+waybill snapshot captures the logo path, so a document issued today keeps the
+mark it was issued with even if they change it next month.
+
+`branding` is the one public storage bucket, and deliberately: a signed URL
+would expire while a printed waybill is still in somebody's hand, and a logo is
+on the company's letterhead already.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

@@ -1,5 +1,7 @@
 'use client';
 
+import { Wordmark } from '@/components/Mark';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { browser } from '@/lib/supabase';
@@ -33,7 +35,7 @@ export default function SignIn() {
 
     // A full reload rather than a client transition: the session cookie was
     // just written, and the server needs to see it on the next request.
-    window.location.href = '/dashboard';
+    window.location.href = '/';
   }
 
   return (
@@ -46,12 +48,7 @@ export default function SignIn() {
       }}
     >
       <div style={{ width: '100%', maxWidth: 380 }}>
-        <div
-          className="brand-mark"
-          style={{ width: 44, height: 44, borderRadius: 14, fontSize: 15, marginBottom: 22 }}
-        >
-          NM
-        </div>
+        <Wordmark size={24} tagline />
         <h1 style={{ fontSize: 25 }}>Sign in</h1>
         <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 7 }}>
           Pick up where your register left off.

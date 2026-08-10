@@ -1,4 +1,5 @@
-import { sb } from '@/lib/session';
+import { sb, logoUrl } from '@/lib/session';
+import { Mark } from '@/components/Mark';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,8 @@ export default async function Waybill({ params }: { params: { id: string } }) {
   }
 
   const s = (doc as any).snapshot;
-  const brand = s.company?.brand_hex ?? '#5B4BE8';
+  const brand = s.company?.brand_hex ?? '#0551BD';
+  const companyLogo = logoUrl(s.company?.logo_path);
   const lines: any[] = s.lines ?? [];
 
   return (
@@ -57,6 +59,13 @@ export default async function Waybill({ params }: { params: { id: string } }) {
       <article className="wb" style={{ ['--wb' as string]: brand } as React.CSSProperties}>
         <header className="wb-head">
           <div>
+            {/* The customer's logo if they have one. A waybill goes to a
+                checkpoint and a third-party depot, so it should carry their
+                identity, not ours. */}
+            {companyLogo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={companyLogo} alt="" className="wb-logo" />
+            )}
             <div className="wb-co">{s.company?.name}</div>
             {s.company?.registration_no && <div className="wb-rc">{s.company.registration_no}</div>}
             {s.company?.address && <div className="wb-addr">{s.company.address}</div>}
@@ -132,7 +141,9 @@ export default async function Waybill({ params }: { params: { id: string } }) {
             stood at issue and do not change afterwards. Any correction is issued as a new
             revision with a new number; this one stays in the archive.
           </p>
-          <p className="wb-brand">Nothing Missing · nothingmissing.ng</p>
+          <p className="wb-brand" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Mark size={13} /> Nothing Missing · nothingmissing.ng
+          </p>
         </footer>
       </article>
     </>

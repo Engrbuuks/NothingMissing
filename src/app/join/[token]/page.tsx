@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Wordmark } from '@/components/Mark';
 import { getSession } from '@/lib/session';
 import { acceptInvitation } from '@/lib/actions';
 
@@ -36,7 +37,7 @@ export default async function Join({
 
   return (
     <main style={{ maxWidth: 460, margin: '0 auto', padding: '72px 24px' }}>
-      <div className="brand-mark" style={{ width: 44, height: 44, borderRadius: 14, fontSize: 15, marginBottom: 22 }}>NM</div>
+      <Wordmark size={24} tagline />
       <h1 style={{ fontSize: 25 }}>Join {inv.company}</h1>
       <p style={{ color: 'var(--text-2)', marginTop: 12, lineHeight: 1.65 }}>
         You have been invited as <b>{inv.role}</b>

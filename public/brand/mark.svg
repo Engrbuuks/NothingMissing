@@ -1,0 +1,19 @@
+<svg viewBox="0 0 72 56" xmlns="http://www.w3.org/2000/svg" width="360" height="280">
+  <rect width="72" height="56" fill="#fff"/>
+
+  <!-- n : stem + one shoulder -->
+  <path d="M3 52V16h7v36H3Z" fill="#061F3E"/>
+  <path d="M10 15.6c8.6 0 14.6 6 14.6 14.4V52h-7V30c0-4.6-3.2-7.6-7.6-7.6v-6.8Z" fill="#061F3E"/>
+
+  <!-- m : two shoulders + stem -->
+  <path d="M47.4 52V30c0-4.6 3.2-7.6 7.6-7.6s7.6 3 7.6 7.6v22h7V30c0-8.4-6-14.4-14.6-14.4S40.4 21.6 40.4 30v22h7Z" fill="#0551BD"/>
+  <path d="M40.4 52V16h-7v36h7Z" fill="#0551BD"/>
+
+  <!-- crate below, two faces meeting at the centre -->
+  <path d="M33.5 40 24 34.5V45l9.5 5.5V40Z" fill="#061F3E"/>
+  <path d="M33.5 40 43 34.5V45l-9.5 5.5V40Z" fill="#085ED5"/>
+
+  <!-- the lid, opening upward as a tick -->
+  <path d="M24 33.2 33.5 38.6 43 27" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M24 32.6 33.5 38 43 26.4" stroke="#0551BD" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

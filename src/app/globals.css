@@ -2,14 +2,14 @@
    specification cannot drift apart. --brand is overridden per tenant at
    runtime from companies.brand_hex. */
 :root{
---brand:#5B4BE8;
-  --brand-2:#8B7BF5;
-  --brand-ink:#3B2FB0;
-  --brand-soft:#EEEBFE;
-  --ink:#101223;
-  --ink-2:#1A1D33;
-  --ink-3:#262A45;
-  --canvas:#F3F4FB;
+--brand:#0551BD;
+  --brand-2:#085ED5;
+  --brand-ink:#03378A;
+  --brand-soft:#E7EFFC;
+  --ink:#061F3E;
+  --ink-2:#0A2B54;
+  --ink-3:#123A6E;
+  --canvas:#F4F6FB;
   --surface:#FFFFFF;
   --text:#14161F;
   --text-2:#5F6379;
@@ -1298,3 +1298,38 @@ body::before{
 .legal p{ font-size:15px;color:var(--text-2);line-height:1.72;margin-bottom:13px }
 .legal p b{ color:var(--text) }
 .legal a{ color:var(--brand);text-decoration:underline }
+
+/* Bank details on the transfer page. Given room deliberately: somebody is
+   copying an account number into a banking app, often on a phone, and a
+   mistyped digit sends money to a stranger. */
+.bankbox{ display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  background:var(--canvas);border:1px solid var(--line);border-radius:16px;padding:22px }
+.bankbox b{ display:block;font-size:15px;margin-top:4px;letter-spacing:-.01em }
+
+/* A company's own logo in the sidebar, sized to sit where the initials block
+   would. object-fit:contain because logos are every aspect ratio there is. */
+.brand-logo{ height:32px;width:auto;max-width:120px;object-fit:contain;flex:none;
+  border-radius:8px;background:rgba(255,255,255,.06);padding:3px 5px }
+
+/* Compact density. A personal preference, not a company one: somebody working
+   through a hundred deliveries wants more rows on screen than somebody reading
+   a report once a week. */
+.shell.dense tbody td{ padding:8px 14px;font-size:12.5px }
+.shell.dense thead th{ padding:9px 14px }
+.shell.dense .card-h{ padding:13px 16px }
+.shell.dense .card-h.bd{ padding-bottom:12px }
+.shell.dense .view{ padding:18px 22px 44px }
+.shell.dense .aname{ font-size:12.5px }
+.shell.dense .amake{ font-size:11px }
+.shell.dense .kpi{ padding:14px 15px }
+.shell.dense .kpi-v{ font-size:24px }
+.wb-logo{ height:44px;width:auto;max-width:190px;object-fit:contain;margin-bottom:10px;display:block }
+@media print{ .wb-logo{ height:38px } }
+.logo-slot{ width:190px;height:76px;border:1px dashed var(--line);border-radius:14px;
+  display:grid;place-items:center;background:var(--canvas);flex:none;padding:8px }
+.logo-slot img{ max-width:100%;max-height:100%;object-fit:contain }
+.swatch{ position:relative;cursor:pointer }
+.swatch input{ position:absolute;opacity:0;pointer-events:none }
+.swatch span{ display:block;width:40px;height:40px;border-radius:12px;
+  outline:2.5px solid transparent;outline-offset:2px;transition:outline-color .15s }
+.swatch input:checked + span{ outline-color:var(--text) }

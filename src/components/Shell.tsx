@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { getSession, canSeeFinancials, type Session } from '@/lib/session';
+import { getSession, canSeeFinancials, logoUrl, sb, type Session } from '@/lib/session';
+import { Mark } from './Mark';
 
 const NAV = [
   { g: 'Overview' },
@@ -45,6 +46,7 @@ export default async function Shell({
 }) {
   const session = await getSession();
   if (!session) redirect('/sign-in');
+  const supa = sb();
 
   // Signed in, but with no membership at this company. Not a filtered view —
   // there is genuinely nothing here for them, and saying so is kinder than an
@@ -65,7 +67,17 @@ export default async function Shell({
   }
 
   const t = session.tenant;
-  const brand = t?.brand_hex ?? '#5B4BE8';
+  const brand = t?.brand_hex ?? '#0551BD';
+  const accent = t?.accent_hex ?? brand;
+  const logo = logoUrl(t?.logo_path);
+
+  // Personal, not company-wide: a manager checking deliveries all day and an
+  // owner reading reports want different densities, and neither should impose
+  // theirs on the other.
+  const { data: prefs } = t
+    ? await supa.from('view_preferences').select('density').eq('company_id', t.id).maybeSingle()
+    : { data: null };
+  const density = (prefs as any)?.density ?? 'comfortable';
   const scope =
     session.scopedLocationIds.length === 0
       ? 'All locations'
@@ -78,12 +90,25 @@ export default async function Shell({
           that references var(--brand) picks it up — without handing a
           database value to the CSS parser as raw text. */}
       <div
-        className="shell"
-        style={{ ['--brand' as string]: brand, ['--brand-soft' as string]: `${brand}1A` } as React.CSSProperties}
+        className={`shell ${density === 'compact' ? 'dense' : ''}`}
+        style={{
+          ['--brand' as string]: brand,
+          ['--brand-2' as string]: accent,
+          ['--brand-soft' as string]: `${brand}14`,
+          ['--brand-ink' as string]: brand,
+        } as React.CSSProperties}
       >
         <aside className="side">
           <div className="brand">
-            <span className="brand-mark">{t ? initials(t.name) : 'NM'}</span>
+            {/* A company that has uploaded a logo sees its own. One that has
+                not sees its initials on its own colour — which is better than
+                showing them our mark, because this is their register. */}
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logo} alt={t?.name ?? ''} className="brand-logo" />
+            ) : (
+              <span className="brand-mark">{t ? initials(t.name) : 'NM'}</span>
+            )}
             <div>
               <div className="brand-name">{t?.name ?? 'Nothing Missing'}</div>
               <div className="brand-sub">Asset control</div>
