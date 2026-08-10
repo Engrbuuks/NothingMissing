@@ -260,6 +260,32 @@ Every figure is a live count scoped by row-level security. Nothing is cached,
 so nothing can drift from the register. A brand new company gets a first-run
 screen offering to import a spreadsheet rather than a wall of zeroes.
 
+### Depth and motion
+
+Two rules kept it honest: nothing moves unless the movement means something,
+and the layout is never changed by an effect — every rule in that section can
+be deleted and the page still measures identically to the prototype.
+
+- A faint brand-tinted wash on the canvas, so white cards sit *on* something
+  rather than float. Below the threshold of noticing, which is the point.
+- Two blooms behind the hero at different speeds. Two gradients drifting
+  against each other read as depth; one reads as a gradient.
+- The estate figure settles in from a blur rather than appearing — the one
+  number worth drawing the eye to, and a number that lands has more weight than
+  one that was simply there.
+- Action tiles grow a coloured bar from the left on hover, so the tile feels
+  selected rather than merely lit. A tile with nothing waiting sits at 72%
+  opacity: at rest, not merely grey.
+- The van in the transit tracker has a halo, bobs gently, and the line behind it
+  carries a slow travelling sheen. It is the one element representing something
+  physically in motion right now, so it earns the attention.
+- Donut segments lift when hovered; hovering the movement chart dims every month
+  but the one under the cursor.
+- Keyboard focus gets the same treatment as hover rather than a browser outline,
+  so navigating without a mouse is not second-class.
+
+All of it stops under `prefers-reduced-motion` — verified, not assumed.
+
 **The stylesheet is copied from the prototype as one substring**, deliberately.
 An earlier attempt extracted it rule by rule with a regex, which lifted every
 mobile override out of its `@media` wrapper and applied it at all widths — so a

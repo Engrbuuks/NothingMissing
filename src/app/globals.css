@@ -958,3 +958,184 @@ tbody tr:last-child td{border-bottom:none}
 @media (prefers-reduced-motion: reduce){
   .hero::after,.hero-live i,.mx-b i,.tv-bar i,.age-t i,.br-t i,.lc-bar i,.comp i{ animation:none }
 }
+
+/* ==========================================================================
+   Depth and motion.
+
+   Everything below is decorative and can be deleted without changing a single
+   figure on the page. Two rules kept it honest: nothing moves unless the
+   movement means something, and nothing animates on a repeat visit — a
+   dashboard that replays its entrance every time you glance at it stops being
+   a tool and becomes a screensaver.
+   ========================================================================== */
+
+/* ---- ambient light ------------------------------------------------------ */
+
+/* The canvas is not flat. A very faint wash from the brand colour at the top
+   makes the white cards sit ON something rather than float in a void. It is
+   below the threshold of noticing, which is the point. */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 420px at 78% -10%, color-mix(in srgb,var(--brand) 8%,transparent) 0%, transparent 70%),
+    radial-gradient(700px 380px at 8% 4%, rgba(14,165,183,.05) 0%, transparent 68%);
+}
+.shell{position:relative;z-index:1}
+
+/* ---- the hero ----------------------------------------------------------- */
+
+/* A second, slower bloom in a different hue, drifting against the first. Two
+   gradients at different speeds read as depth; one reads as a gradient. */
+.hero{
+  box-shadow:
+    0 30px 60px -40px rgba(16,18,35,.75),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+.hero-bloom2{
+  position:absolute;bottom:-280px;left:-120px;width:560px;height:560px;
+  border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,#0EA5B7 0%,transparent 62%);
+  opacity:.16;animation:drift 14s ease-in-out infinite alternate;
+}
+@keyframes drift{
+  from{ transform:translate(0,0) scale(1) }
+  to  { transform:translate(60px,-40px) scale(1.12) }
+}
+
+/* A hairline highlight across the top edge, the way light catches a real
+   surface. Costs nothing and stops the panel reading as a flat rectangle. */
+.hero::before{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* The estate figure counts up on first paint rather than appearing. It is the
+   one number worth drawing the eye to, and a number that lands has more weight
+   than one that was simply there. */
+.hero-num{ display:inline-block; animation:settle .9s cubic-bezier(.16,.9,.3,1) .2s backwards }
+@keyframes settle{
+  from{ opacity:0; transform:translateY(10px) scale(.97); filter:blur(6px) }
+  to  { opacity:1; transform:none; filter:none }
+}
+
+/* The four hero stats arrive one after another, left to right. */
+.hs{ animation:rise .5s cubic-bezier(.2,.85,.3,1) backwards }
+.hs:nth-child(1){ animation-delay:.42s }
+.hs:nth-child(2){ animation-delay:.50s }
+.hs:nth-child(3){ animation-delay:.58s }
+.hs:nth-child(4){ animation-delay:.66s }
+
+/* ---- action tiles ------------------------------------------------------- */
+
+/* A thin coloured bar grows across the top on hover, anchored left, so the
+   tile feels like it is being selected rather than merely lit. */
+.rtile::before{
+  content:'';position:absolute;top:0;left:0;height:3px;width:100%;
+  background:var(--rc);border-radius:3px 3px 0 0;
+  transform:scaleX(0);transform-origin:left;transition:transform .28s cubic-bezier(.2,.85,.3,1);
+}
+.rtile:hover::before{ transform:scaleX(1) }
+.rtile.urgent::before{ transform:scaleX(1) }
+.rtile:active{ transform:translateY(-1px) }
+
+/* The number itself lifts very slightly — the tile responds as one object. */
+.rtile-n{ transition:transform .22s cubic-bezier(.2,.85,.3,1) }
+.rtile:hover .rtile-n{ transform:translateY(-2px) }
+
+/* A tile with nothing waiting should look at rest, not merely grey. */
+.rtile:has(.rtile-n[data-zero="1"]){ opacity:.72 }
+.rtile:has(.rtile-n[data-zero="1"]):hover{ opacity:1 }
+
+/* ---- cards -------------------------------------------------------------- */
+
+/* Lift is small and the shadow is tinted with the ink colour rather than pure
+   black, so it reads as the page's own light rather than a drop shadow. */
+.ovgrid .card,.stack .card{
+  transition:transform .24s cubic-bezier(.2,.85,.3,1),box-shadow .24s,border-color .24s;
+}
+.ovgrid .card:hover,.stack .card:hover{ transform:translateY(-2px) }
+
+/* Rows in the matrix and lists slide a hair on hover, which makes a dense
+   table feel navigable rather than printed. */
+.mx,.tv,.br-r,.ci{ transition:background .16s,padding-left .18s }
+.mx:hover,.tv:hover,.ci:hover{ padding-left:24px }
+
+/* ---- charts ------------------------------------------------------------- */
+
+/* Donut segments lift out of the ring when hovered. */
+.donut-c circle{ transition:stroke-width .2s,opacity .2s }
+.donut-c:hover circle{ opacity:.55 }
+.donut-c circle:hover{ stroke-width:16;opacity:1 }
+
+/* The centre figure fades in after the segments have drawn, so the breakdown
+   is read before the total. */
+.donut-mid{ animation:fade .5s ease .85s backwards }
+
+/* Bars in the movement chart lighten on hover so a month can be picked out. */
+.bcol{ transition:opacity .18s }
+.bars:hover .bcol{ opacity:.45 }
+.bars .bcol:hover{ opacity:1 }
+.bseg{ transition:filter .18s }
+.bcol:hover .bseg{ filter:brightness(1.12) }
+
+/* ---- the transit tracker ------------------------------------------------ */
+
+/* The van has a soft halo and a gentle bob, because it is the one element on
+   the page representing something physically in motion right now. */
+.track-van{
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 18%,transparent),
+             0 6px 14px -6px var(--brand);
+  animation:bob 2.6s ease-in-out infinite;
+}
+@keyframes bob{ 0%,100%{ transform:translate(-50%,-50%) } 50%{ transform:translate(-50%,-58%) } }
+
+/* The line behind it has a travelling sheen — slow enough to read as progress
+   rather than a loading bar. */
+.track-fill{ position:relative;overflow:hidden }
+.track-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:translateX(-100%);animation:sheen 2.8s ease-in-out infinite;
+}
+@keyframes sheen{ 0%{ transform:translateX(-100%) } 60%,100%{ transform:translateX(220%) } }
+
+/* An overdue consignment pulses its badge. This is the one alarm on the page
+   and it earns the attention. */
+.trip:has(.p-bad) .track-van{
+  box-shadow:0 0 0 4px rgba(225,75,66,.2),0 6px 14px -6px var(--bad);
+}
+
+/* ---- the feed ----------------------------------------------------------- */
+
+/* Entries stagger in, newest first, so the eye starts at the top. */
+.fi{ animation:rise .45s cubic-bezier(.2,.85,.3,1) backwards }
+.fi:nth-child(1){ animation-delay:.30s }
+.fi:nth-child(2){ animation-delay:.36s }
+.fi:nth-child(3){ animation-delay:.42s }
+.fi:nth-child(4){ animation-delay:.48s }
+.fi:nth-child(5){ animation-delay:.54s }
+.fi:nth-child(6){ animation-delay:.60s }
+
+/* ---- focus ---------------------------------------------------------------
+   Keyboard focus gets the same treatment as hover rather than a browser
+   outline, so navigating without a mouse is not a second-class experience. */
+.rtile:focus-visible{
+  outline:none;border-color:var(--rc);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--rc) 20%,transparent);
+}
+.rtile:focus-visible::before{ transform:scaleX(1) }
+.mx:focus-visible,.tv:focus-visible,.ci:focus-visible,.trip:focus-visible{
+  outline:2px solid var(--brand);outline-offset:-2px;border-radius:10px;
+}
+
+/* ---- honour the setting -------------------------------------------------
+   Someone who has asked their system for reduced motion has usually asked for
+   a reason. Everything decorative stops; nothing informational is lost. */
+@media (prefers-reduced-motion: reduce){
+  .hero-bloom2,.track-van,.track-fill::after,.hero-num,.hs,.fi,.donut-mid{
+    animation:none !important;
+  }
+  .rtile::before,.rtile-n,.mx,.tv,.ci,.ovgrid .card,.stack .card{
+    transition:none !important;
+  }
+  .mx:hover,.tv:hover,.ci:hover{ padding-left:20px }
+}

@@ -206,6 +206,9 @@ export default async function Dashboard() {
 
         {/* ---------- hero ---------- */}
         <section className="hero">
+          {/* A second, slower bloom drifting against the first. Two gradients at
+              different speeds read as depth; one reads as a gradient. */}
+          <span className="hero-bloom2" aria-hidden="true" />
           <div className="hero-l">
             <div className="hero-eyebrow">
               <span className="tagx">Whole company</span>
@@ -301,7 +304,13 @@ export default async function Dashboard() {
                 </span>
                 <span className="rtile-go">→</span>
               </div>
-              <div className="rtile-n" style={{ color: a.n > 0 ? a.c : 'var(--text-3)' }}>{a.n}</div>
+              <div
+                className="rtile-n"
+                data-zero={a.n === 0 ? '1' : undefined}
+                style={{ color: a.n > 0 ? a.c : 'var(--text-3)' }}
+              >
+                {a.n}
+              </div>
               <div className="rtile-l">{a.l}</div>
               <div className="rtile-m">{a.m}</div>
             </a>
