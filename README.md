@@ -308,6 +308,45 @@ phone number and often no work email. Discrepancy alerts are locked on: they
 are the safety net on the register, and a company that silences them discovers
 its own losses months late.
 
+## Search, filter, export, add
+
+Every list screen carries a toolbar built the same way, and the choices behind
+it are worth stating.
+
+**Filters live in the URL, via a GET form.** A filtered register becomes a link
+someone can send — "here is every generator at Ibadan that is overdue" — and the
+back button behaves. A client-side filter would have neither property.
+
+**Filtering happens in the query, not after fetching.** A register of 20,000
+assets should not travel over the wire to show twelve rows. The one exception is
+category, which sits two joins away and PostgREST cannot filter on a nested
+relation's parent, so that one narrows after the fetch and is documented as
+such in the code.
+
+**Export honours the same filters and the same permissions.** What downloads is
+what was on screen. If the caller's role cannot see costs, the cost columns are
+dropped entirely rather than exported blank — a blank column invites someone to
+assume the data is missing rather than withheld. An export is the easiest way to
+walk financial data out of a system, so it asks the database the same question
+the register does and gets the same answer.
+
+| Screen | Search | Filters | Export | Create |
+|---|---|---|---|---|
+| Assets | tag, serial, name, holder | category, location, status | CSV | add asset, import |
+| Inventory | SKU, name | category, location | count sheet | add item, issue, receive, move |
+| Catalog | model, brand, type | category | — | category, type, brand, model |
+| Transfers | waybill, reference, driver, vehicle | status | — | new transfer |
+| Audit | action, reference, detail, person | entity, severity | CSV | — (append-only) |
+| Locations | — | — | — | add, sweep, archive |
+
+Verified against a live database: search returns the right rows, the location +
+status filter narrows correctly, adding an asset works, a duplicate serial is
+refused outright, a new unit inherits its model's service interval and appears
+as overdue, and the stock ledger balances after an issue.
+
+CSV escaping is unit-tested against commas, quotes, newlines and nulls — a
+broken CSV opens fine and reads wrong, which is the worst kind of broken.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

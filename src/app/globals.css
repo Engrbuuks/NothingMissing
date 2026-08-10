@@ -1139,3 +1139,13 @@ body::before{
   }
   .mx:hover,.tv:hover,.ci:hover{ padding-left:20px }
 }
+
+
+/* KPI tiles, taken from the prototype. */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 19px}
+.kpi-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.kpi-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+.kpi-ic svg{width:18px;height:18px}
+.kpi-v{font-family:var(--display);font-size:27px;font-weight:800;letter-spacing:-.035em;line-height:1}
+.kpi-l{font-size:12.5px;color:var(--text-3);margin-top:5px}

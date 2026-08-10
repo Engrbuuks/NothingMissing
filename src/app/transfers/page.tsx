@@ -27,13 +27,17 @@ type Row = {
 const days = (iso: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : null;
 
-export default async function Transfers() {
+export default async function Transfers({
+  searchParams,
+}: { searchParams: { q?: string; status?: string } }) {
   const session = await getSession();
   const supabase = sb();
+  const q = (searchParams.q ?? '').trim();
+  const fstatus = searchParams.status ?? 'all';
 
   // RLS returns only transfers where this person can act at one end or the
   // other, so there is no company or location filter here.
-  const { data, error } = await supabase
+  let query = supabase
     .from('transfers')
     .select(
       `id, reference, status, waybill_no, dispatched_at,
@@ -42,7 +46,12 @@ export default async function Transfers() {
        transfer_lines ( count )`
     )
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
+
+  if (fstatus !== 'all') query = query.eq('status', fstatus);
+  if (q) query = query.or(`reference.ilike.%${q}%,waybill_no.ilike.%${q}%,driver_name.ilike.%${q}%,vehicle_reg.ilike.%${q}%`);
+
+  const { data, error } = await query;
 
   const rows = (data ?? []) as unknown as Row[];
   const moving = rows.filter((r) => r.status === 'in_transit');
@@ -54,11 +63,21 @@ export default async function Transfers() {
       title="Transfers"
       subtitle="Assets moving between registers"
     >
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <a className="btn btn-p" href="/transfers/new">
-          New transfer
-        </a>
-      </div>
+      <form className="toolbar" method="get" action="/transfers">
+        <div className="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+          </svg>
+          <input name="q" defaultValue={q} placeholder="Search waybill, reference, driver or vehicle" />
+        </div>
+        <select className="sel" name="status" defaultValue={fstatus}>
+          <option value="all">Any status</option>
+          {Object.entries(STATE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <button className="btn btn-g" type="submit">Apply</button>
+        {(q || fstatus !== 'all') && <a className="btn btn-g" href="/transfers">Clear</a>}
+        <a className="btn btn-p" href="/transfers/new" style={{ marginLeft: 'auto' }}>New transfer</a>
+      </form>
 
       {error && (
         <div className="notice bad">

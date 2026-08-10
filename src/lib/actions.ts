@@ -513,3 +513,143 @@ export async function sweepLocation(id: string): Promise<void> {
   if (error) redirect('/locations?error=' + encodeURIComponent(error.message));
   redirect('/locations?swept=1');
 }
+
+export async function createAsset(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const location = String(formData.get('location') ?? '');
+  const { data: loc } = await supabase
+    .from('locations').select('company_id').eq('id', location).maybeSingle();
+  if (!loc) redirect('/assets/new?error=' + encodeURIComponent('That location could not be read.'));
+
+  const cost = String(formData.get('cost') ?? '').replace(/[^\d]/g, '');
+  const model = String(formData.get('model') ?? '');
+
+  const { data: asset, error } = await supabase
+    .from('assets')
+    .insert({
+      company_id: loc.company_id,
+      tag: String(formData.get('tag') ?? '').trim(),
+      name: String(formData.get('name') ?? '').trim(),
+      serial_no: String(formData.get('serial') ?? '').trim() || null,
+      model_id: model || null,
+      location_id: location,
+      status: 'active',
+      holder: String(formData.get('holder') ?? '').trim() || null,
+      acquired_on: String(formData.get('acquired') ?? '') || null,
+      meter_value: Number(formData.get('meter') ?? 0) || 0,
+      meter_unit: String(formData.get('meter_unit') ?? '') || null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !asset) {
+    redirect('/assets/new?error=' + encodeURIComponent(error?.message ?? 'Could not add the asset.'));
+  }
+
+  // Cost goes in its own table, so an asset added by someone who cannot see
+  // costs simply has no financial row rather than a zero.
+  if (cost) {
+    await supabase.from('asset_financials').insert({
+      asset_id: asset.id,
+      company_id: loc.company_id,
+      purchase_cost_minor: Number(cost) * 100,
+      invoice_ref: String(formData.get('invoice') ?? '') || null,
+    });
+  }
+
+  revalidatePath('/assets');
+  redirect(`/assets/${asset.id}?added=1`);
+}
+
+export async function createCategory(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/catalog?error=' + encodeURIComponent('No company in scope.'));
+  const { error } = await supabase.from('categories').insert({
+    company_id: co.id,
+    name: String(formData.get('name') ?? '').trim(),
+  });
+  revalidatePath('/catalog');
+  if (error) redirect('/catalog?error=' + encodeURIComponent(error.message));
+  redirect('/catalog?added=1');
+}
+
+export async function createBrand(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/catalog?error=' + encodeURIComponent('No company in scope.'));
+  const { error } = await supabase.from('brands').insert({
+    company_id: co.id,
+    name: String(formData.get('name') ?? '').trim(),
+  });
+  revalidatePath('/catalog');
+  if (error) redirect('/catalog?error=' + encodeURIComponent(error.message));
+  redirect('/catalog?added=1');
+}
+
+export async function createModel(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const sub = String(formData.get('sub_category') ?? '');
+  const { data: s } = await supabase
+    .from('sub_categories').select('company_id').eq('id', sub).maybeSingle();
+  if (!s) redirect('/catalog?error=' + encodeURIComponent('Pick a type first.'));
+
+  const rate = String(formData.get('rate') ?? '').trim();
+  const { error } = await supabase.from('models').insert({
+    company_id: s.company_id,
+    sub_category_id: sub,
+    brand_id: String(formData.get('brand') ?? ''),
+    name: String(formData.get('name') ?? '').trim(),
+    service_life_years: Number(formData.get('life') ?? 0) || null,
+    warranty_months: Number(formData.get('warranty') ?? 0) || null,
+    service_interval: Number(formData.get('interval') ?? 0) || null,
+    service_interval_unit: String(formData.get('interval_unit') ?? '') || null,
+    // Typed, never parsed out of a description: "1104A-44TG2" would otherwise
+    // yield 1104 litres an hour.
+    consumption_rate: rate ? Number(rate) : null,
+    consumption_unit: rate ? 'per_hour' : null,
+  });
+  revalidatePath('/catalog');
+  if (error) redirect('/catalog?error=' + encodeURIComponent(error.message));
+  redirect('/catalog?added=1');
+}
+
+export async function createSubCategory(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const cat = String(formData.get('category') ?? '');
+  const { data: c } = await supabase
+    .from('categories').select('company_id').eq('id', cat).maybeSingle();
+  if (!c) redirect('/catalog?error=' + encodeURIComponent('Pick a category first.'));
+  const { error } = await supabase.from('sub_categories').insert({
+    company_id: c.company_id,
+    category_id: cat,
+    name: String(formData.get('name') ?? '').trim(),
+  });
+  revalidatePath('/catalog');
+  if (error) redirect('/catalog?error=' + encodeURIComponent(error.message));
+  redirect('/catalog?added=1');
+}
+
+export async function createStockItem(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/inventory?error=' + encodeURIComponent('No company in scope.'));
+
+  const unit = String(formData.get('unit') ?? 'units');
+  const { error } = await supabase.from('stock_items').insert({
+    company_id: co.id,
+    sku: String(formData.get('sku') ?? '').trim(),
+    name: String(formData.get('name') ?? '').trim(),
+    category: String(formData.get('category') ?? '') || null,
+    unit,
+    // Litres and kilogrammes divide; helmets do not. Getting this wrong is how
+    // a register ends up recording half a helmet.
+    is_divisible: ['litres', 'kg', 'metres', 'm'].includes(unit.toLowerCase()),
+    reorder_point: Number(formData.get('reorder') ?? 0) || 0,
+    unit_cost_minor: Number(String(formData.get('cost') ?? '').replace(/[^\d]/g, '') || 0) * 100,
+    variance_tolerance_pct: Number(formData.get('tolerance') ?? 0) || 0,
+  });
+  revalidatePath('/inventory');
+  if (error) redirect('/inventory?error=' + encodeURIComponent(error.message));
+  redirect('/inventory?added=1');
+}
