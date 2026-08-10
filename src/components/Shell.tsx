@@ -90,7 +90,9 @@ export default async function Shell({
           that references var(--brand) picks it up — without handing a
           database value to the CSS parser as raw text. */}
       <div
-        className={`shell ${density === 'compact' ? 'dense' : ''}`}
+        className={`shell ${density === 'compact' ? 'dense' : ''} ${
+          t?.theme_mode === 'dark' ? 'theme-dark' : ''
+        }`}
         style={{
           ['--brand' as string]: brand,
           ['--brand-2' as string]: accent,

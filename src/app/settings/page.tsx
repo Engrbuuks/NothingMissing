@@ -78,7 +78,6 @@ export default async function Settings({
         </div>
         <form action={updateCompany} style={{ padding: 20, display: 'grid', gap: 16 }}>
           <input type="hidden" name="id" value={c.id} />
-          <input type="hidden" name="brand" value={c.brand_hex} />
           <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
             <div>
               <label className="lbl" htmlFor="name">Registered name</label>

@@ -1333,3 +1333,45 @@ body::before{
 .swatch span{ display:block;width:40px;height:40px;border-radius:12px;
   outline:2.5px solid transparent;outline-offset:2px;transition:outline-color .15s }
 .swatch input:checked + span{ outline-color:var(--text) }
+
+/* ==========================================================================
+   Dark interface.
+
+   A company chooses this once and everyone in it gets it, because a register
+   is often read in a plant room or a yard office at night where a white screen
+   is genuinely painful.
+
+   It re-points the tokens rather than inverting anything: --canvas becomes the
+   dark surface, --surface the slightly lighter card, and the text scale
+   flips. Every component already reads these, so nothing else changes.
+   ========================================================================== */
+.shell.theme-dark{
+  --canvas:#0B1524;
+  --surface:#111E31;
+  --ink:#060F1C;
+  --ink-2:#0E1B2C;
+  --line:#1E2E45;
+  --line-2:#182639;
+  --text:#E8EDF5;
+  --text-2:#A3B0C4;
+  --text-3:#6B7B93;
+  --brand-soft:#12294A;
+  --ok-soft:#0F2A20;
+  --warn-soft:#2C2410;
+  --bad-soft:#331618;
+  --sky-soft:#102640;
+}
+.shell.theme-dark{ background:var(--canvas) }
+.shell.theme-dark .top{ background:rgba(17,30,49,.86);border-bottom-color:var(--line) }
+.shell.theme-dark thead th{ background:#0E1B2C;border-bottom-color:var(--line) }
+.shell.theme-dark tbody tr:hover{ background:#16253A }
+.shell.theme-dark .inp{ background:#0E1B2C;border-color:var(--line);color:var(--text) }
+.shell.theme-dark .btn-g{ background:#16253A;border-color:var(--line);color:var(--text) }
+.shell.theme-dark .btn-g:hover{ border-color:#2A3D57 }
+.shell.theme-dark .mx:hover,.shell.theme-dark .tv:hover,.shell.theme-dark .ci:hover{ background:#16253A }
+.shell.theme-dark .card{ box-shadow:none }
+.shell.theme-dark .hero{ background:#060F1C }
+/* Charts read on either surface: the ring track has to lift off the card
+   rather than disappear into it. */
+.shell.theme-dark .donut-c circle:first-child{ stroke:rgba(255,255,255,.06) }
+.shell.theme-dark .stockbar,.shell.theme-dark .perf-bar{ background:#1E2E45 }

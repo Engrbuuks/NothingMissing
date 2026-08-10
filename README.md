@@ -603,6 +603,25 @@ mark it was issued with even if they change it next month.
 would expire while a printed waybill is still in somebody's hand, and a logo is
 on the company's letterhead already.
 
+## Two branding bugs, and how to find the next one
+
+**The company details form was resetting the colour.** It carried a hidden
+`brand` field holding whatever the colour was when the page rendered, and wrote
+it back on save — so changing a phone number silently reverted the theme. Two
+forms owned one field. Now only the appearance form does.
+
+**Dark mode was stored but never applied.** The control existed, the value
+saved, and nothing happened, because no CSS read it. It now re-points the
+tokens rather than inverting anything: `--canvas` becomes the dark surface,
+`--surface` the lighter card, the text scale flips. Every component already
+reads those, so nothing else changed.
+
+Branding passes through four layers — the migration, the stored value,
+`resolve_tenant`, and the storage bucket — and a failure in any of them looks
+identical from outside: nothing changes. So `/diagnostics` now checks each
+separately and says which one broke, including fetching the logo to confirm the
+bucket actually serves it.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

@@ -75,6 +75,75 @@ export default async function Diagnostics() {
 
   // The important one. If this ever returns a row, tenant isolation is broken
   // and nothing else about the system can be trusted.
+  // --- branding, step by step -------------------------------------------
+  // Colour and logo pass through four layers, and a failure in any one looks
+  // identical from the outside: nothing changes. So each is checked separately.
+  const { data: company, error: companyErr } = await supabase
+    .from('companies')
+    .select('brand_hex, accent_hex, theme_mode, logo_path, brand_source')
+    .limit(1)
+    .maybeSingle();
+  const cmp = (company ?? {}) as any;
+
+  const hasThemeColumns = !companyErr || !/theme_mode|column/i.test(companyErr.message);
+
+  const resolvedBrand = resolved?.brand_hex ?? null;
+
+  let logoReachable: boolean | null = null;
+  const logoHref = cmp.logo_path
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/branding/${cmp.logo_path}`
+    : null;
+  if (logoHref) {
+    try {
+      const r = await fetch(logoHref, { method: 'HEAD', cache: 'no-store' });
+      logoReachable = r.ok;
+    } catch {
+      logoReachable = false;
+    }
+  }
+
+  const brandChecks = [
+    {
+      label: 'Migration 0020 applied',
+      ok: hasThemeColumns,
+      detail: hasThemeColumns
+        ? 'The theme columns exist on app.companies'
+        : 'theme_mode and accent_hex are missing — run migration 0020',
+    },
+    {
+      label: 'A colour is stored',
+      ok: Boolean(cmp.brand_hex),
+      detail: cmp.brand_hex
+        ? `${cmp.brand_hex} (${cmp.brand_source === 'chosen' ? 'chosen in Settings' : 'still the default'})`
+        : 'No brand_hex on the company row',
+    },
+    {
+      label: 'The colour reaches the page',
+      ok: Boolean(resolvedBrand) && resolvedBrand === cmp.brand_hex,
+      detail:
+        resolvedBrand === cmp.brand_hex
+          ? `resolve_tenant returns ${resolvedBrand}, which matches`
+          : `resolve_tenant returns ${resolvedBrand ?? 'nothing'} but the company row says ${cmp.brand_hex ?? 'nothing'} — re-run migration 0020, which updates that function`,
+    },
+    {
+      label: 'A logo is set',
+      ok: Boolean(cmp.logo_path),
+      detail: cmp.logo_path
+        ? String(cmp.logo_path)
+        : 'None uploaded yet — Settings → Your logo. Initials are shown instead.',
+    },
+    {
+      label: 'The logo file is reachable',
+      ok: logoReachable === true,
+      detail:
+        logoReachable === null
+          ? 'Nothing to check until a logo is uploaded'
+          : logoReachable
+            ? 'The branding bucket serves it publicly'
+            : 'The file did not load. The `branding` bucket must exist and be marked Public — see backend/STORAGE.md',
+    },
+  ];
+
   const { data: leak } = await supabase.from('companies').select('id, name, slug');
   const visibleCompanies = leak ?? [];
 
@@ -136,6 +205,31 @@ export default async function Diagnostics() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h bd">
+          <div>
+            <div className="card-t">Branding</div>
+            <div className="card-s">Each step has to pass for a company&rsquo;s colour and logo to show</div>
+          </div>
+        </div>
+        <div style={{ padding: '4px 0' }}>
+          {brandChecks.map((c) => (
+            <div key={c.label} style={{ display: 'flex', gap: 12, padding: '13px 20px',
+                 borderBottom: '1px solid var(--line-2)', alignItems: 'flex-start' }}>
+              <span className={`pill ${c.ok ? 'p-ok' : 'p-bad'}`} style={{ flex: 'none' }}>
+                <span className="pd" />{c.ok ? 'Pass' : 'Fail'}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.label}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 3, lineHeight: 1.5 }}>
+                  {c.detail}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

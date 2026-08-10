@@ -473,7 +473,10 @@ export async function updateCompany(formData: FormData): Promise<void> {
       registration_no: String(formData.get('rc') ?? '') || null,
       address: String(formData.get('address') ?? '') || null,
       phone: String(formData.get('phone') ?? '') || null,
-      brand_hex: String(formData.get('brand') ?? '#5B4BE8'),
+      // The brand colour is NOT set here. This form is company details; the
+      // appearance form owns the colour. Writing it from both meant saving a
+      // phone number silently reset the theme to whatever was in a hidden
+      // field when the page was rendered.
     })
     .eq('id', id);
 
