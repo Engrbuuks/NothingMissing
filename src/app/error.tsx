@@ -18,9 +18,18 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Once error tracking is wired, this is where it goes. Until then the
-    // digest is what ties a report to a server log.
-    console.error(error);
+    // The digest shown to the user below is the same one carried in the
+    // report, so "it said reference a7f3c2" matches one specific failure
+    // rather than a time range.
+    void fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        digest: error.digest,
+        route: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      }),
+    }).catch(() => { /* never let reporting break the error page */ });
   }, [error]);
 
   const isPermission = /permission denied|row-level security|42501/i.test(error.message);

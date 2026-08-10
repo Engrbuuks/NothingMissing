@@ -84,9 +84,12 @@ export default async function TransferDetail({
       title={tr.waybill_no ?? tr.reference}
       subtitle={`${tr.from?.name ?? '—'} → ${tr.to?.name ?? '—'}`}
     >
-      <a className="btn btn-g" href="/transfers" style={{ marginBottom: 18 }}>
-        Back to transfers
-      </a>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <a className="btn btn-g" href="/transfers">Back to transfers</a>
+        {tr.waybill_no && (
+          <a className="btn btn-g" href={`/transfers/${tr.id}/waybill`}>Print the waybill</a>
+        )}
+      </div>
 
       {searchParams.error && (
         <div className="notice bad">

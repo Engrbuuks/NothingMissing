@@ -347,6 +347,144 @@ as overdue, and the stock ledger balances after an issue.
 CSV escaping is unit-tested against commas, quotes, newlines and nulls — a
 broken CSV opens fine and reads wrong, which is the worst kind of broken.
 
+## Creating an account
+
+`/sign-up` → confirm email → `/onboarding` → the company exists at its own
+subdomain. Migration `0014` closes six specific loopholes, each a real way this
+would have broken or been abused:
+
+1. **No profile on signup.** Supabase writes `auth.users`, not `app.profiles`,
+   so `create_company()` failed with a foreign key error on every single
+   sign-up. Now a trigger on `auth.users`.
+2. **Unlimited companies per account.** Ten owned, three per hour.
+3. **Unverified email owning a company.** Anyone could squat a slug using an
+   address they do not control. Confirmation required before creation.
+4. **Forwarded invitations.** Tokens are hashed, single-use, expiring, and
+   bound to the address they were sent to.
+5. **Privilege escalation by invite.** An admin could mint an owner and then be
+   removed by them. Only an owner invites an owner.
+6. **Slug race.** Two sign-ups passing the availability check at the same
+   instant both proceeded, and the second got a constraint error it could not
+   act on. Now it retries.
+
+## Deleting things
+
+Migration `0015`. The line is not "important versus unimportant" — it is
+whether anything else points at the row.
+
+| | |
+|---|---|
+| **Deletes** | locations with no history, unused catalog entries, stock items that never moved, draft transfers, suppliers with no orders, link holders who never submitted, memberships |
+| **Archives** | anything with history — and says so, with the reason and the way forward |
+| **Never** | `audit_events`, `stock_movements` |
+
+A location that has appeared on a waybill is referenced by that waybill, by
+every asset that passed through, and by the audit rows describing those
+movements. Deleting it makes the waybill print with a blank origin — and nobody
+can tell whether that is a bug or a cover-up. So it archives, and the refusal
+says exactly that.
+
+Three bugs came out of building this, each one the previous fix's consequence:
+
+- The location's *own* creation audit row blocked its deletion.
+- Fixing that with `ON DELETE SET NULL` made the cascade itself an UPDATE, which
+  the append-only trigger refused.
+- The trigger now permits exactly one thing: releasing `location_id` to null
+  with every other column identical. Not a general hole — a named exception,
+  and the log is still immutable in every other respect. Verified.
+- Then the deletion's own audit row tried to file itself *at* the location it
+  had just deleted. A deletion event cannot reference the thing it deleted.
+
+Closing a company archives it, revokes every field link, and retires the
+address — nobody else can claim a URL whose links are still on people's phones.
+Other people's submissions and the audit trail survive: that history is not the
+owner's to erase.
+
+## The marketing site
+
+On the apex, in the `(marketing)` route group — deliberately not the
+application's visual language. Home, pricing, security, about.
+
+The pricing page says plainly that ₦180 per asset is a starting number, that
+2,800 assets comes to ₦504,000 a month, and that we would rather be told it is
+wrong than lose a customer to a figure picked before meeting them. The security
+page lists what is not done — no SOC 2, no third-party pen test — because a
+customer finds that out eventually and it is better volunteered.
+
+## Documents, billing and consent (0016)
+
+**Waybills are frozen.** Issuing one snapshots the company details, the route,
+the driver and every line. A driver carries this through checkpoints, so the
+copy in his hand has to keep matching the copy in the system — renaming a
+location next month must not silently rewrite a document issued today.
+Verified: after renaming Lagos HQ, the issued waybill still reads Lagos HQ.
+A correction is a new revision with a new number; the original stays.
+
+Printing goes through the browser's own dialogue rather than server-side PDF
+generation. It produces a real PDF, respects the user's paper size, and needs
+no headless Chrome running somewhere to break at 2am.
+
+**Attachments** are metadata rows; files live in object storage under a key
+namespaced by company, so a bucket policy can enforce the same separation the
+database does. MIME types are an allow-list — the interesting attacks are
+always the format nobody thought of.
+
+**Billing** counts assets from the register rather than storing a number, so
+the figure on the billing page is the same figure on the dashboard and cannot
+drift from it.
+
+**Consent** is versioned. A boolean cannot say *which* terms someone accepted,
+which is the only thing that matters if it is ever disputed.
+
+## Performance, measured (0017)
+
+Twenty thousand assets in one company, row-level security active:
+
+| | before | after |
+|---|---|---|
+| register page, 500 rows, 2 joins | 251 ms | 104 ms |
+| search across tag, serial, holder | 259 ms | 120 ms |
+| dashboard status rollup | 245 ms | 105 ms |
+| audit log page | 245 ms | **7 ms** |
+
+The first attempt added indexes and changed nothing, which was the useful
+result. The plan showed why:
+
+    Seq Scan on assets (rows=20005)
+      Filter: (app.is_member(company_id) AND ...)
+
+The policy called a function **once per row** — twenty thousand calls, each
+running its own subquery. No index can help, because the filter is a function
+call rather than a comparison the planner can push down.
+
+Rewriting the policies on the hot tables as set membership, with `auth.uid()`
+wrapped in a scalar subquery so it is evaluated once as an InitPlan, lets
+Postgres use a hash semi-join instead. The rule is identical.
+
+That last part was checked rather than assumed: after the rewrite, a rival
+company still sees zero assets, zero audit rows and zero costs; a location
+manager still sees one location and no financial data; and a cross-site move is
+still refused by `WITH CHECK`. All 271 assertions still pass.
+
+## Notifications, errors and legal
+
+`RESEND_API_KEY` turns email on. Without it, messages queue and are visible in
+the app but are not delivered — a missing key degrades to "nothing sent"
+rather than a crash on an unrelated screen. WhatsApp and SMS queue but do not
+deliver; they need a Nigerian provider account, and sending half-built messages
+to real phone numbers is worse than sending none.
+
+Errors report as structured JSON to the server log, carrying the same digest
+the user was shown — so "it said reference a7f3c2" matches one specific
+failure rather than a time range. `SENTRY_DSN` forwards them somewhere durable.
+
+Terms and privacy are versioned pages, written for the Nigeria Data Protection
+Act. The privacy notice states one limit plainly: actions someone took inside a
+company's register stay in that company's audit log even if they leave and even
+if they ask for removal. That log is the basis of somebody else's asset
+register, the company is its controller, and we cannot erase it on an
+individual's request.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

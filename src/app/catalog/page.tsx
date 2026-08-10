@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canWrite, canSeeFinancials, money } from '@/lib/session';
-import { createCategory, createSubCategory, createBrand, createModel } from '@/lib/actions';
+import { createCategory, createSubCategory, createBrand, createModel,
+         deleteCategory, deleteSubCategory, deleteBrand, deleteModel } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ const CAT_COLOUR = ['#5B4BE8', '#E39A11', '#0FA45E', '#E14B42', '#0EA5B7', '#2E7
  */
 export default async function Catalog({
   searchParams,
-}: { searchParams: { q?: string; cat?: string; error?: string; added?: string } }) {
+}: { searchParams: { q?: string; cat?: string; error?: string; added?: string; deleted?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const q = (searchParams.q ?? '').trim();
@@ -68,6 +69,7 @@ export default async function Catalog({
     >
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Added to the catalog.</p></div>}
+      {searchParams.deleted && <div className="notice"><p>Removed. Nothing was using it.</p></div>}
 
       <form className="toolbar" method="get" action="/catalog">
         <div className="search">
@@ -121,6 +123,7 @@ export default async function Catalog({
                   <th>Model</th><th>Type</th><th>Units owned</th><th>Service life</th>
                   <th>Warranty</th><th>Service every</th>
                   {canSeeFinancials(session) && <th>List cost</th>}
+                  {canWrite(session) && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -160,6 +163,13 @@ export default async function Catalog({
                       {canSeeFinancials(session) && (
                         <td className="mono" style={{ fontSize: 12.5 }}>{money(m.list_cost_minor)}</td>
                       )}
+                      {canWrite(session) && (
+                        <td style={{ textAlign: 'right' }}>
+                          <form action={deleteModel.bind(null, m.id)}>
+                            <button className="btn btn-g" type="submit" style={{ color: 'var(--bad)' }}>Delete</button>
+                          </form>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -182,6 +192,11 @@ export default async function Catalog({
                   <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT_COLOUR[i % CAT_COLOUR.length] }} />
                   <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{c.name}</span>
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} type{n === 1 ? '' : 's'}</span>
+                  {canWrite(session) && (
+                    <form action={deleteCategory.bind(null, c.id)}>
+                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
+                    </form>
+                  )}
                 </div>
               );
             })}
@@ -206,6 +221,11 @@ export default async function Catalog({
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
                   <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{s.name}</span>
                   <span className="pill p-mute">{cat?.name ?? '—'}</span>
+                  {canWrite(session) && (
+                    <form action={deleteSubCategory.bind(null, s.id)}>
+                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
+                    </form>
+                  )}
                 </div>
               );
             })}
@@ -238,6 +258,11 @@ export default async function Catalog({
                   </span>
                   <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{b.name}</span>
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} model{n === 1 ? '' : 's'}</span>
+                  {canWrite(session) && (
+                    <form action={deleteBrand.bind(null, b.id)}>
+                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
+                    </form>
+                  )}
                 </div>
               );
             })}

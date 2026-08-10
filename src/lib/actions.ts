@@ -653,3 +653,97 @@ export async function createStockItem(formData: FormData): Promise<void> {
   if (error) redirect('/inventory?error=' + encodeURIComponent(error.message));
   redirect('/inventory?added=1');
 }
+
+/* ========================================================================== */
+/* Sign-up, invitations and deletion                                          */
+/* ========================================================================== */
+
+export async function createCompanyAccount(formData: FormData): Promise<void> {
+  const { data, error } = await sb().rpc('signup_company', {
+    p_company_name: String(formData.get('company') ?? ''),
+    p_slug: String(formData.get('slug') ?? '') || null,
+    p_full_name: String(formData.get('name') ?? '') || null,
+    p_registration: String(formData.get('rc') ?? '') || null,
+    p_address: String(formData.get('address') ?? '') || null,
+  });
+
+  if (error) redirect('/onboarding?error=' + encodeURIComponent(error.message));
+  // A tenant lives on its own subdomain, so this is a hard navigation to a
+  // different origin rather than a client-side transition.
+  redirect((data as any)?.url ?? '/');
+}
+
+export async function inviteMember(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/people?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('invite_member', {
+    p_company: co.id,
+    p_email: String(formData.get('email') ?? ''),
+    p_role: String(formData.get('role') ?? 'requester'),
+    p_location: String(formData.get('location') ?? '') || null,
+  });
+
+  revalidatePath('/people');
+  if (error) redirect('/people?error=' + encodeURIComponent(error.message));
+  // Shown once. Nothing but the hash is stored, so it cannot be retrieved.
+  redirect(`/people?invite=${encodeURIComponent((data as any)?.path ?? '')}`);
+}
+
+export async function revokeInvitation(id: string): Promise<void> {
+  const { error } = await sb().rpc('revoke_invitation', { p_id: id });
+  revalidatePath('/people');
+  if (error) redirect('/people?error=' + encodeURIComponent(error.message));
+}
+
+export async function acceptInvitation(formData: FormData): Promise<void> {
+  const token = String(formData.get('token') ?? '');
+  const { data, error } = await sb().rpc('accept_invitation', { p_token: token });
+  if (error) redirect(`/join/${token}?error=` + encodeURIComponent(error.message));
+  redirect((data as any)?.url ?? '/');
+}
+
+/**
+ * Deletion. Every one of these calls a database function that checks what
+ * refers to the row first — so a refusal arrives with a reason and a way
+ * forward rather than a foreign key error nobody can act on.
+ */
+async function tryDelete(fn: string, arg: Record<string, unknown>, back: string) {
+  const { error } = await sb().rpc(fn, arg);
+  revalidatePath(back);
+  redirect(error ? `${back}?error=${encodeURIComponent(error.message)}` : `${back}?deleted=1`);
+}
+
+export const deleteLocation = (id: string) => tryDelete('delete_location', { p_id: id }, '/locations');
+export const deleteModel = (id: string) => tryDelete('delete_model', { p_id: id }, '/catalog');
+export const deleteBrand = (id: string) => tryDelete('delete_brand', { p_id: id }, '/catalog');
+export const deleteSubCategory = (id: string) => tryDelete('delete_sub_category', { p_id: id }, '/catalog');
+export const deleteCategory = (id: string) => tryDelete('delete_category', { p_id: id }, '/catalog');
+export const deleteStockItem = (id: string) => tryDelete('delete_stock_item', { p_id: id }, '/inventory');
+export const archiveStockItem = (id: string) => tryDelete('archive_stock_item', { p_id: id }, '/inventory');
+export const deleteTransferDraft = (id: string) => tryDelete('delete_transfer', { p_id: id }, '/transfers');
+export const deleteSupplier = (id: string) => tryDelete('delete_supplier', { p_id: id }, '/suppliers');
+export const archiveSupplier = (id: string) => tryDelete('archive_supplier', { p_id: id }, '/suppliers');
+export const deleteLinkHolder = (id: string) => tryDelete('delete_link_holder', { p_id: id }, '/people');
+
+export async function removeMember(userId: string): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/people?error=' + encodeURIComponent('No company in scope.'));
+  const { error } = await supabase.rpc('remove_member', { p_company: co.id, p_user: userId });
+  revalidatePath('/people');
+  redirect(error ? `/people?error=${encodeURIComponent(error.message)}` : '/people?removed=1');
+}
+
+export async function closeCompany(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
+  const { error } = await supabase.rpc('archive_company', {
+    p_company: co.id,
+    p_confirm: String(formData.get('confirm') ?? ''),
+  });
+  if (error) redirect('/settings?error=' + encodeURIComponent(error.message));
+  redirect('/auth/sign-out');
+}

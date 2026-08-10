@@ -7,7 +7,8 @@ import { currentTenant, getSession } from '@/lib/session';
  */
 export default async function Home() {
   const tenant = await currentTenant();
-  if (!tenant) redirect('/welcome');
+  // The apex is the marketing site, served by the (marketing) route group.
+  if (!tenant) redirect('/home');
 
   const session = await getSession();
   if (!session) redirect('/sign-in');

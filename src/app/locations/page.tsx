@@ -1,12 +1,12 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole, canSeeFinancials, money } from '@/lib/session';
-import { createLocation, archiveLocation, sweepLocation } from '@/lib/actions';
+import { createLocation, archiveLocation, sweepLocation, deleteLocation } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Locations({
   searchParams,
-}: { searchParams: { error?: string; added?: string; swept?: string } }) {
+}: { searchParams: { error?: string; added?: string; swept?: string; deleted?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const admin = hasRole(session, 'owner', 'admin');
@@ -30,6 +30,7 @@ export default async function Locations({
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Location added.</p></div>}
       {searchParams.swept && <div className="notice"><p>Swept. Everything moved to the virtual warehouse.</p></div>}
+      {searchParams.deleted && <div className="notice"><p>Removed. It had no history, so nothing referenced it.</p></div>}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
       <div className="card" style={{ marginBottom: 18 }}>
@@ -37,8 +38,9 @@ export default async function Locations({
           <div>
             <div className="card-t">{live.length} location{live.length === 1 ? '' : 's'}</div>
             <div className="card-s">
-              Locations archive rather than delete — waybills and audit rows reference them by
-              id, and dropping one turns every reference into a dangling pointer
+              A location with any history archives rather than deletes: waybills and audit
+              rows reference it by id, and dropping it would leave them pointing at nothing.
+              One created by mistake, with nothing referring to it, deletes cleanly.
             </div>
           </div>
         </div>
@@ -75,9 +77,17 @@ export default async function Locations({
                             <button className="btn btn-g" type="submit">Sweep {n} to virtual</button>
                           </form>
                         ) : (
-                          <form action={archiveLocation.bind(null, l.id)}>
-                            <button className="btn btn-g" type="submit">Archive</button>
-                          </form>
+                          <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+                            <form action={archiveLocation.bind(null, l.id)}>
+                              <button className="btn btn-g" type="submit">Archive</button>
+                            </form>
+                            {/* Delete is offered, and the database decides. A site
+                                with any history refuses and says to archive instead. */}
+                            <form action={deleteLocation.bind(null, l.id)}>
+                              <button className="btn btn-g" type="submit"
+                                style={{ color: 'var(--bad)' }}>Delete</button>
+                            </form>
+                          </div>
                         )}
                       </td>
                     )}

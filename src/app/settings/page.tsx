@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
-import { updateCompany } from '@/lib/actions';
+import { updateCompany, closeCompany } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,7 +106,7 @@ export default async function Settings({
         </form>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-h bd">
           <div><div className="card-t">Your address</div>
           <div className="card-s">Where your team signs in, and where your field links point</div></div>
@@ -121,6 +121,34 @@ export default async function Settings({
           </p>
         </div>
       </div>
+      {hasRole(session, 'owner') && (
+        <div className="card" style={{ borderColor: 'var(--bad-soft)' }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t" style={{ color: 'var(--bad)' }}>Close this company</div>
+              <div className="card-s">
+                It archives rather than deletes, and that is deliberate
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.65, maxWidth: '62ch' }}>
+              Closing revokes every field link immediately and retires your address, so nobody
+              else can claim a URL whose links are still sitting in people&rsquo;s phones. The
+              register, the audit trail and everyone&rsquo;s submissions are kept — other
+              people&rsquo;s work is not yours to erase, and a dispute six months from now will
+              need them.
+            </p>
+            <form action={closeCompany} style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <input className="inp" name="confirm" placeholder={`Type "${c.name}" to confirm`}
+                     style={{ flex: 1, minWidth: 220 }} />
+              <button className="btn btn-g" type="submit" style={{ color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}>
+                Close the company
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }

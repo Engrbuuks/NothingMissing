@@ -20,9 +20,9 @@ const ROOT = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
 const RESERVED = new Set([
   'www','app','api','admin','cdn','static','assets','mail','smtp','ftp',
   'ns1','ns2','mx','dev','staging','test','demo','sandbox','l','s',
-  'sign-in','signin','login','signup','register','logout','reset','invite',
+  'sign-in','signin','login','signup','sign-up','register','logout','reset','invite','join',
   'onboarding','field','pricing','about','blog','docs','help','legal',
-  'privacy','terms','contact','status','security',
+  'privacy','terms','contact','status','security','waybill',
   'support','billing','account','accounts','nothingmissing','official',
   'system','root','noreply','security-team',
 ]);

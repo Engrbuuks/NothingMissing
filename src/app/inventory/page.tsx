@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canSeeFinancials, canWrite, money } from '@/lib/session';
-import { issueStock, receiveStock, transferStock } from '@/lib/actions';
+import { issueStock, receiveStock, transferStock, deleteStockItem, archiveStockItem } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ const short = (minor: number) => {
 
 export default async function Inventory({
   searchParams,
-}: { searchParams: { q?: string; cat?: string; loc?: string; error?: string; added?: string; moved?: string } }) {
+}: { searchParams: { q?: string; cat?: string; loc?: string; error?: string; added?: string; moved?: string; deleted?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const showCost = canSeeFinancials(session);
@@ -85,6 +85,7 @@ export default async function Inventory({
     <Shell current="inventory" title="Inventory" subtitle={`Consumable stock ${where}`}>
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Stock item added.</p></div>}
+      {searchParams.deleted && <div className="notice"><p>Done.</p></div>}
       {searchParams.moved && <div className="notice"><p>Recorded. The ledger has a row with your name on it.</p></div>}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
@@ -158,6 +159,7 @@ export default async function Inventory({
                 <tr>
                   <th>SKU</th><th>Item</th><th>Category</th><th>On hand</th>
                   <th>Reorder at</th><th>Status</th>{showCost && <th>Value</th>}
+                  {canWrite(session) && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -189,6 +191,18 @@ export default async function Inventory({
                       </td>
                       {showCost && (
                         <td className="mono" style={{ fontSize: 12.5 }}>{money(qty * Number(i.unit_cost_minor ?? 0))}</td>
+                      )}
+                      {canWrite(session) && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <form action={archiveStockItem.bind(null, i.id)}>
+                              <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12 }}>Archive</button>
+                            </form>
+                            <form action={deleteStockItem.bind(null, i.id)}>
+                              <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
+                            </form>
+                          </div>
+                        </td>
                       )}
                     </tr>
                   );
