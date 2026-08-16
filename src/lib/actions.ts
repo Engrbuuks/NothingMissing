@@ -1116,3 +1116,47 @@ export async function commitBranchImport(formData: FormData): Promise<void> {
   if (error) redirect('/import?error=' + encodeURIComponent(error.message));
   redirect(`/assets?imported=${(data as any)?.assets ?? 0}`);
 }
+
+export async function setMemberRole(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/people?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('set_member_role', {
+    p_company: co.id,
+    p_user: String(formData.get('user') ?? ''),
+    p_role: String(formData.get('role') ?? ''),
+    p_location: String(formData.get('location') ?? '') || null,
+  });
+
+  revalidatePath('/people');
+  redirect(error ? `/people?error=${encodeURIComponent(error.message)}` : '/people?role=1');
+}
+
+export async function updateAsset(formData: FormData): Promise<void> {
+  const id = String(formData.get('id') ?? '');
+  const supabase = sb();
+
+  // Only fields the form actually sent. A disabled input submits nothing, so
+  // a requester's form cannot carry a tag or serial at all — the trigger is
+  // the real guard, but not sending them avoids a confusing refusal.
+  const patch: Record<string, unknown> = {
+    name: String(formData.get('name') ?? '').trim(),
+    holder: String(formData.get('holder') ?? '').trim() || null,
+    model_id: String(formData.get('model') ?? '') || null,
+    location_id: String(formData.get('location') ?? '') || null,
+    status: String(formData.get('status') ?? 'active'),
+    notes: String(formData.get('notes') ?? '').trim() || null,
+    meter_value: Number(formData.get('meter') ?? 0) || 0,
+    meter_unit: String(formData.get('meter_unit') ?? '') || null,
+  };
+
+  if (formData.get('tag')) patch.tag = String(formData.get('tag')).trim();
+  if (formData.get('serial')) patch.serial_no = String(formData.get('serial')).trim();
+
+  const { error } = await supabase.from('assets').update(patch).eq('id', id);
+
+  revalidatePath(`/assets/${id}`);
+  revalidatePath('/assets');
+  redirect(error ? `/assets/${id}/edit?error=${encodeURIComponent(error.message)}` : `/assets/${id}?saved=1`);
+}

@@ -107,10 +107,14 @@ export default async function AssetDetail({
 
   return (
     <Shell current="assets" title={a.name} subtitle={a.tag}>
-      <a className="btn btn-g" href="/assets" style={{ marginBottom: 18 }}>
-        Back to the register
-      </a>
-
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <a className="btn btn-g" href="/assets">Back to the register</a>
+        {canWrite(session) && (
+          <a className="btn btn-p" href={`/assets/${a.id}/edit`} style={{ marginLeft: 'auto' }}>
+            Edit
+          </a>
+        )}
+      </div>
       {searchParams.error && (
         <div className="notice bad">
           <p>{searchParams.error}</p>

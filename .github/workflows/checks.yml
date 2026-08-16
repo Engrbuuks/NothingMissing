@@ -28,6 +28,11 @@ jobs:
       - name: spreadsheet parsing
         run: node tests-parse.mjs
 
+      # Every RPC a page calls and every table it queries must exist. A
+      # mismatch is invisible until somebody opens the page and gets nothing.
+      - name: pages match the schema
+        run: node tests-schema.mjs
+
   database:
     name: schema, RLS and 271 assertions
     runs-on: ubuntu-latest

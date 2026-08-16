@@ -77,6 +77,9 @@ export default async function Field({
   }
 
   const verbs: string[] = ctx.verbs ?? [];
+  const runningLow: boolean = Boolean(ctx.running_low);
+  const usedThisMonth: number = ctx.used_this_month ?? 0;
+  const monthlyLimit: number | null = ctx.monthly_limit ?? null;
   const items: { sku: string; name: string; unit: string }[] = ctx.items ?? [];
   const assets: { id: string; tag: string; name: string }[] = ctx.assets ?? [];
   const can = (v: string) => verbs.includes(v);
@@ -107,7 +110,7 @@ export default async function Field({
           maxWidth: 520,
           margin: '0 auto',
           padding: '32px 16px 60px',
-          ['--brand' as string]: ctx.brand ?? '#5B4BE8',
+          ['--brand' as string]: ctx.brand_hex ?? '#0551BD',
         } as React.CSSProperties
       }
     >
@@ -128,6 +131,17 @@ export default async function Field({
       {searchParams.error && (
         <div className="notice bad">
           <p>{searchParams.error}</p>
+        </div>
+      )}
+
+      {/* Warned while it can still be acted on. A link that simply stops
+          working mid-count teaches people the system is unreliable. */}
+      {runningLow && monthlyLimit !== null && (
+        <div className="notice warn">
+          <p>
+            <b>{monthlyLimit - usedThisMonth} submissions left this month.</b> It resets on
+            the first. Tell your manager if you need more before then.
+          </p>
         </div>
       )}
 

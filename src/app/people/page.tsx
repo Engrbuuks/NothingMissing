@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
-import { issueLink, revokeLink } from '@/lib/actions';
+import { issueLink, revokeLink, setMemberRole } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,29 +14,78 @@ const VERBS: [string, string][] = [
 
 export default async function People({
   searchParams,
-}: { searchParams: { token?: string; slug?: string; error?: string } }) {
+}: { searchParams: { token?: string; slug?: string; error?: string; role?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const isAdmin = hasRole(session, 'owner', 'admin');
 
   const { data: members } = await supabase
     .from('memberships')
-    .select('id, role, location_id, profiles ( full_name, email ), locations ( name )');
+    .select('id, user_id, role, location_id, profiles ( full_name, email ), locations ( name )');
 
-  const { data: links } = await supabase
-    .from('location_links')
-    .select(`id, slug, verbs, expires_on, used_count, last_used_at, revoked_at,
-             link_holders ( name, role_label, phone ), locations ( name )`)
-    .is('revoked_at', null);
+  // link_health answers the question a manager actually has — is this link
+  // working, how much of its monthly allowance is gone, and has anyone touched
+  // it lately. A link nobody has used in six weeks is either a person who has
+  // left or a process that quietly stopped.
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  const { data: health } = co
+    ? await supabase.rpc('link_health', { p_company: (co as any).id })
+    : { data: [] as any[] };
+  const links = health;
 
   const { data: locations } = await supabase
     .from('locations').select('id, name').is('archived_at', null).order('name');
+
+  // What each role can do, read from the database rather than written here, so
+  // the description and the behaviour cannot drift apart.
+  const { data: caps } = await supabase.rpc('role_capabilities');
+  const owners = ((members ?? []) as any[]).filter((m) => m.role === 'owner').length;
 
   const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
 
   return (
     <Shell current="people" title="People" subtitle="Accounts, and the people who hold a link instead">
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+      {searchParams.role && <div className="notice"><p>Role updated.</p></div>}
+
+      {owners === 1 && isAdmin && (
+        <div className="notice warn">
+          <p>
+            <b>This company has one owner.</b> If that person leaves or loses access, nobody
+            can administer it — only an owner can make another owner. Promote a second one
+            below while you can.
+          </p>
+        </div>
+      )}
+
+      <details className="explain" style={{ marginBottom: 18 }}>
+        <summary>What can each role do?</summary>
+        <div className="explain-body">
+          <div className="tbl-wrap">
+            <table>
+              <thead><tr><th>Role</th><th>Sees</th><th>Can</th><th>Cannot</th></tr></thead>
+              <tbody>
+                {((caps ?? []) as any[]).map((c) => (
+                  <tr key={c.role}>
+                    <td><b style={{ textTransform: 'capitalize' }}>{c.role}</b></td>
+                    <td style={{ color: 'var(--text-2)' }}>{c.scope}</td>
+                    <td>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
+                        {(c.can_do ?? []).map((x: string) => <li key={x}>{x}</li>)}
+                      </ul>
+                    </td>
+                    <td>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                        {(c.cannot_do ?? []).map((x: string) => <li key={x}>{x}</li>)}
+                      </ul>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
 
       {searchParams.token && (
         <div className="notice">
@@ -60,7 +109,7 @@ export default async function People({
         </div>
         <div className="tbl-wrap">
           <table>
-            <thead><tr><th>Person</th><th>Role</th><th>Scope</th></tr></thead>
+            <thead><tr><th>Person</th><th>Role</th><th>Scope</th>{isAdmin && <th />}</tr></thead>
             <tbody>
               {(members ?? []).map((m: any) => (
                 <tr key={m.id}>
@@ -72,6 +121,32 @@ export default async function People({
                   <td style={{ color: 'var(--text-2)' }}>
                     {m.location_id ? m.locations?.name : 'All locations'}
                   </td>
+                  {isAdmin && (
+                    <td style={{ textAlign: 'right' }}>
+                      {/* The select posts on change of the button beside it, so
+                          a mis-click does not silently change somebody's role. */}
+                      <form action={setMemberRole} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <input type="hidden" name="user" value={m.user_id} />
+                        <select className="inp" name="role" defaultValue={m.role}
+                                style={{ width: 130, padding: '6px 9px', fontSize: 12.5 }}>
+                          <option value="owner">Owner</option>
+                          <option value="admin">Admin</option>
+                          <option value="manager">Manager</option>
+                          <option value="requester">Requester</option>
+                          <option value="auditor">Auditor</option>
+                        </select>
+                        <select className="inp" name="location" defaultValue={m.location_id ?? ''}
+                                style={{ width: 120, padding: '6px 9px', fontSize: 12.5 }}>
+                          <option value="">All locations</option>
+                          {(locations ?? []).map((l: any) => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                        <button className="btn btn-g" type="submit"
+                                style={{ padding: '6px 11px', fontSize: 12.5 }}>Set</button>
+                      </form>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -100,33 +175,60 @@ export default async function People({
         ) : (
           <div className="tbl-wrap">
             <table>
-              <thead><tr><th>Holder</th><th>Location</th><th>Can do</th><th>Used</th><th>Expires</th>{isAdmin && <th />}</tr></thead>
+              <thead>
+                <tr>
+                  <th>Holder</th><th>Location</th><th>Can do</th>
+                  <th>This month</th><th>Last used</th><th>Status</th>
+                  {isAdmin && <th />}
+                </tr>
+              </thead>
               <tbody>
-                {(links ?? []).map((l: any) => (
-                  <tr key={l.id}>
-                    <td>
-                      <div className="aname">{l.link_holders?.name ?? '—'}</div>
-                      <div className="amake">{l.link_holders?.role_label ?? ''} {l.link_holders?.phone ?? ''}</div>
-                    </td>
-                    <td style={{ color: 'var(--text-2)' }}>{l.locations?.name ?? '—'}</td>
-                    <td>
-                      {(l.verbs ?? []).map((v: string) => (
-                        <span key={v} className="pill p-mute" style={{ marginRight: 4 }}>
-                          {VERBS.find(([k]) => k === v)?.[1] ?? v}
-                        </span>
-                      ))}
-                    </td>
-                    <td className="mono">{l.used_count}</td>
-                    <td style={{ color: 'var(--text-2)' }}>{l.expires_on}</td>
-                    {isAdmin && (
-                      <td style={{ textAlign: 'right' }}>
-                        <form action={revokeLink.bind(null, l.id)}>
-                          <button className="btn btn-g" type="submit">Revoke</button>
-                        </form>
+                {(health ?? []).map((l: any) => {
+                  const tone =
+                    l.state === 'working' ? 'p-ok'
+                    : l.state === 'revoked' || l.state === 'expired' || l.state === 'at limit' ? 'p-bad'
+                    : l.state === 'quiet' || l.state === 'never used' ? 'p-mute'
+                    : 'p-warn';
+                  return (
+                    <tr key={l.link_id}>
+                      <td><div className="aname">{l.holder}</div></td>
+                      <td style={{ color: 'var(--text-2)' }}>{l.location}</td>
+                      <td>
+                        {(l.verbs ?? []).map((v: string) => (
+                          <span key={v} className="pill p-mute" style={{ marginRight: 4 }}>
+                            {VERBS.find(([k]) => k === v)?.[1] ?? v}
+                          </span>
+                        ))}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="mono">
+                        {l.used_this_month}
+                        {l.monthly_limit ? <span style={{ color: 'var(--text-3)' }}> / {l.monthly_limit}</span> : ''}
+                      </td>
+                      <td style={{ color: 'var(--text-2)' }}>
+                        {l.last_used_at
+                          ? `${l.days_since_use} day${l.days_since_use === 1 ? '' : 's'} ago`
+                          : 'never'}
+                      </td>
+                      <td>
+                        <span className={`pill ${tone}`}><span className="pd" />{l.state}</span>
+                        {l.days_left <= 14 && l.days_left >= 0 && (
+                          <div className="amake" style={{ marginTop: 3 }}>
+                            expires in {l.days_left} day{l.days_left === 1 ? '' : 's'}
+                          </div>
+                        )}
+                      </td>
+                      {isAdmin && (
+                        <td style={{ textAlign: 'right' }}>
+                          {l.state !== 'revoked' && (
+                            <form action={revokeLink.bind(null, l.link_id)}>
+                              <button className="btn btn-g" type="submit">Revoke</button>
+                            </form>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

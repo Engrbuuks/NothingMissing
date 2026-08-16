@@ -827,6 +827,41 @@ because the trim happened before the collapse rather than after.
 Only `Name` is required. Tags are generated for rows without one, carrying on
 from the existing numbering.
 
+## Four things that were wrong (0026)
+
+Found by probing the database as each role, not by reading the code. Every one
+of these looked correct in the source.
+
+**A requester could retire any asset.** Retiring removes something from every
+live register — the most destructive act short of disposal — and the most
+junior writing role could do it to anything in scope. The role exists so a site
+clerk can add what arrives and correct a holder, not so they can quietly empty
+a depot. Now manager and above, enforced by trigger so it holds wherever the
+update comes from.
+
+**Serials and tags could be silently overwritten.** The serial is the one field
+tying a database row to a physical object — what an auditor matches against and
+what a scan resolves. Anyone with write access could replace it, making the
+register describe a different machine with nothing on screen saying so. Now
+owner or admin only. Filling in a *blank* serial is still open to anyone, because
+somebody walking the floor with a scanner is exactly the behaviour to encourage.
+
+**The audit log said "updated assets" and nothing else.** The before and after
+states were captured correctly, so the trail was intact — but nobody could see
+what changed without querying jsonb by hand, and a trail nobody can read is a
+trail nobody checks. It now reads: *"name changed from Unit to Renamed unit,
+holder set to Musa Ibrahim"*.
+
+**Nothing encouraged a second owner.** Several were always permitted, but a
+company whose only owner leaves is unreachable — only an owner can make another
+owner. There is now a role control on the People page, a warning when a company
+has exactly one owner, and `set_member_role()` refuses to let the last owner
+demote themselves.
+
+`role_capabilities()` returns what each role can and cannot do as data, and the
+People page renders it. The description and the behaviour cannot drift apart
+because they are the same source.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,
