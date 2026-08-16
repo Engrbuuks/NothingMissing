@@ -795,6 +795,38 @@ They are short on purpose. Fifteen attributes on a chair means nobody fills any
 in; six means the form is answerable in a minute, and six filled fields beat
 fifteen empty ones.
 
+## Adding a branch (0024)
+
+The old import needed a location to already exist, took three columns, and
+committed straight from the paste box. That meant five screens of setup —
+location, category, type, brand, model — before a single asset could be
+entered, which is where people gave up.
+
+Now it is paste, preview, confirm. `import_branch()` creates the location, the
+categories, the types, the brands and a catalog model per distinct make and
+model, then the assets linked to all of it. Verified: 200 assets sharing four
+models, 200 unique generated tags, nothing rejected.
+
+**Dry run first.** The same function with commit off reports exactly what it
+would create and reject, and writes nothing. Importing 400 rows and discovering
+afterwards that a column was misread is how somebody ends up with 400 assets
+called "Qty".
+
+That preview had a bug worth recording: it counted six new brands for a file
+naming two, because it could not deduplicate by querying when it writes
+nothing. It now tracks what it has already counted, and dry run and commit
+report identical numbers.
+
+**Header matching is deliberately generous.** `S/N`, `Serial No.` and
+`Serial Number` all resolve; so do `Make` and `Manufacturer`, `Description` and
+`Item`. Tabs work as well as commas, because people paste out of Excel.
+`tests-parse.mjs` covers fourteen header spellings and runs in CI — it caught
+`Serial No.` failing, where stripping the full stop left a trailing space
+because the trim happened before the collapse rather than after.
+
+Only `Name` is required. Tags are generated for rows without one, carrying on
+from the existing numbering.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

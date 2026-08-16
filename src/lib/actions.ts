@@ -1,5 +1,7 @@
 'use server';
 
+import { parseSheet } from './sheet';
+
 /**
  * Server actions for movement.
  *
@@ -1038,4 +1040,79 @@ export async function applyAttributePack(pack: string): Promise<void> {
   redirect(error
     ? `/catalog/attributes?error=${encodeURIComponent(error.message)}`
     : `/catalog/attributes?pack=${encodeURIComponent((data as any)?.category ?? pack)}`);
+}
+
+/**
+ * Branch import.
+ *
+ * Parsing happens here rather than in the database, because a spreadsheet is a
+ * human artefact: headers are capitalised differently, columns are named
+ * "S/N" or "Serial No.", and someone always pastes a trailing blank line.
+ * Being generous about that is the difference between a customer onboarding
+ * and a customer giving up.
+ */
+export async function previewBranchImport(formData: FormData): Promise<void> {
+  const raw = String(formData.get('sheet') ?? '').trim();
+  const branch = String(formData.get('branch') ?? '').trim();
+  const existing = String(formData.get('existing') ?? '');
+
+  if (!raw) redirect('/import?error=' + encodeURIComponent('Paste your rows first.'));
+  if (!branch && !existing) {
+    redirect('/import?error=' + encodeURIComponent('Name the branch, or pick an existing one.'));
+  }
+
+  const { rows } = parseSheet(raw);
+  if (!rows.length) {
+    redirect('/import?error=' + encodeURIComponent(
+      'No rows found. The first line should be your column names.'));
+  }
+
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/import?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('import_branch', {
+    p_company: co.id,
+    p_location_name: branch || 'existing',
+    p_rows: rows,
+    p_commit: false,
+    p_location_id: existing || null,
+    p_city: String(formData.get('city') ?? '') || null,
+  });
+
+  if (error) redirect('/import?error=' + encodeURIComponent(error.message));
+
+  // The preview is held in the URL rather than a session: a refresh should show
+  // the same preview, and nothing has been written yet to lose.
+  const qs = new URLSearchParams({
+    branch, existing, city: String(formData.get('city') ?? ''), sheet: raw,
+  });
+  redirect(`/import/review?${qs.toString()}`);
+}
+
+export async function commitBranchImport(formData: FormData): Promise<void> {
+  const raw = String(formData.get('sheet') ?? '');
+  const branch = String(formData.get('branch') ?? '').trim();
+  const existing = String(formData.get('existing') ?? '');
+
+  const { rows } = parseSheet(raw);
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/import?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('import_branch', {
+    p_company: co.id,
+    p_location_name: branch || 'existing',
+    p_rows: rows,
+    p_commit: true,
+    p_location_id: existing || null,
+    p_city: String(formData.get('city') ?? '') || null,
+  });
+
+  revalidatePath('/assets');
+  revalidatePath('/locations');
+  revalidatePath('/catalog');
+
+  if (error) redirect('/import?error=' + encodeURIComponent(error.message));
+  redirect(`/assets?imported=${(data as any)?.assets ?? 0}`);
 }

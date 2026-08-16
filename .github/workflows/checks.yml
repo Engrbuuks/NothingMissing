@@ -23,6 +23,11 @@ jobs:
       - name: storage access control
         run: node tests-storage.mjs
 
+      # Header matching is what makes a real customer's spreadsheet import or
+      # bounce, and it is easy to break without noticing.
+      - name: spreadsheet parsing
+        run: node tests-parse.mjs
+
   database:
     name: schema, RLS and 271 assertions
     runs-on: ubuntu-latest
