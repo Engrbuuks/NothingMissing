@@ -56,6 +56,9 @@ export default async function AdminPayments({
           The one cross-tenant screen in the product — and it shows only what a transfer
           needs
         </div>
+        <div style={{ display: 'flex', gap: 9, marginTop: 14 }}>
+          <a className="btn btn-g" href="/admin/companies">Companies and billing</a>
+        </div>
       </div>
 
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}

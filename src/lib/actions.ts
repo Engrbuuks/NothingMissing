@@ -784,91 +784,6 @@ export async function startPayment(): Promise<void> {
   redirect(result.authorization_url);
 }
 
-/**
- * Recording a bank transfer.
- *
- * The receipt is uploaded to storage and a claim row is created. Nothing is
- * activated by this — a doctored image must not buy service, so confirmation
- * happens against the actual bank statement, by a person, in /admin/claims.
- */
-export async function submitTransferReceipt(formData: FormData): Promise<void> {
-  const supabase = sb();
-  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
-  if (!co) redirect('/billing?error=' + encodeURIComponent('No company in scope.'));
-
-  const file = formData.get('receipt') as File | null;
-  let path: string | null = null;
-  let name: string | null = null;
-  let mime: string | null = null;
-  let bytes: number | null = null;
-
-  if (file && file.size > 0) {
-    if (file.size > 10 * 1024 * 1024) {
-      redirect('/billing?error=' + encodeURIComponent('That file is over 10 MB. A photo of the alert is enough.'));
-    }
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
-    if (!allowed.includes(file.type)) {
-      redirect('/billing?error=' + encodeURIComponent('Upload a photo or a PDF of the transfer receipt.'));
-    }
-
-    const { data: keyed } = await supabase.rpc('receipt_path', {
-      p_company: co.id, p_file: file.name,
-    });
-    const key = String(keyed);
-
-    const { error: upErr } = await supabase.storage
-      .from('receipts')
-      .upload(key, file, { contentType: file.type, upsert: false });
-
-    if (upErr) {
-      redirect('/billing?error=' + encodeURIComponent(
-        `Could not store the receipt: ${upErr.message}. The transfer itself is unaffected — try again or email it to us.`));
-    }
-
-    path = key; name = file.name; mime = file.type; bytes = file.size;
-  }
-
-  const { error } = await supabase.rpc('submit_transfer_claim', {
-    p_company: co.id,
-    p_paid_on: String(formData.get('paid_on') ?? ''),
-    p_bank_from: String(formData.get('bank_from') ?? '') || null,
-    p_narration: String(formData.get('narration') ?? '') || null,
-    p_note: String(formData.get('note') ?? '') || null,
-    p_receipt_path: path,
-    p_receipt_name: name,
-    p_receipt_mime: mime,
-    p_receipt_bytes: bytes,
-  });
-
-  revalidatePath('/billing');
-  if (error) redirect('/billing?error=' + encodeURIComponent(error.message));
-  redirect('/billing?submitted=1');
-}
-
-export async function reviewClaim(formData: FormData): Promise<void> {
-  const id = String(formData.get('id') ?? '');
-  const confirm = String(formData.get('decision') ?? '') === 'confirm';
-  const actual = String(formData.get('actual') ?? '').replace(/[^\d]/g, '');
-
-  const { error } = await sb().rpc('review_transfer_claim', {
-    p_claim: id,
-    p_confirm: confirm,
-    p_note: String(formData.get('note') ?? '') || null,
-    p_actual_minor: actual ? Number(actual) * 100 : null,
-  });
-
-  revalidatePath('/admin/claims');
-  redirect(error ? `/admin/claims?error=${encodeURIComponent(error.message)}` : '/admin/claims?done=1');
-}
-
-/**
- * Recording a bank transfer.
- *
- * The receipt is uploaded to storage from the browser before this runs, so a
- * large image never passes through a server action — and the path is namespaced
- * by company, so a bucket policy can enforce the same separation the database
- * does.
- */
 export async function submitPaymentProof(formData: FormData): Promise<void> {
   const supabase = sb();
   const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
@@ -970,4 +885,157 @@ export async function saveViewPreferences(formData: FormData): Promise<void> {
   revalidatePath('/settings');
   revalidatePath('/assets');
   redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
+}
+
+/* ========================================================================== */
+/* Platform: free access and provisioning                                     */
+/* ========================================================================== */
+
+export async function toggleBilling(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('set_billing_enabled', {
+    p_on: String(formData.get('on') ?? '') === 'yes',
+    p_notice: String(formData.get('notice') ?? '') || null,
+  });
+  revalidatePath('/admin/companies');
+  revalidatePath('/billing');
+  redirect(error ? `/admin/companies?error=${encodeURIComponent(error.message)}` : '/admin/companies?saved=1');
+}
+
+export async function setComped(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('set_comped', {
+    p_company: String(formData.get('company') ?? ''),
+    p_on: String(formData.get('on') ?? '') === 'yes',
+    p_reason: String(formData.get('reason') ?? '') || null,
+    p_until: String(formData.get('until') ?? '') || null,
+  });
+  revalidatePath('/admin/companies');
+  redirect(error ? `/admin/companies?error=${encodeURIComponent(error.message)}` : '/admin/companies?saved=1');
+}
+
+export async function provisionCompany(formData: FormData): Promise<void> {
+  const { data, error } = await sb().rpc('provision_company', {
+    p_owner_email: String(formData.get('email') ?? ''),
+    p_owner_name: String(formData.get('name') ?? ''),
+    p_company_name: String(formData.get('company') ?? ''),
+    p_slug: String(formData.get('slug') ?? '') || null,
+    p_comp: formData.get('comped') === 'on',
+    p_comp_reason: String(formData.get('reason') ?? '') || 'Early customer',
+    p_registration: String(formData.get('rc') ?? '') || null,
+    p_address: String(formData.get('address') ?? '') || null,
+  });
+
+  revalidatePath('/admin/companies');
+  if (error) redirect('/admin/companies?error=' + encodeURIComponent(error.message));
+  redirect(`/admin/companies?created=${encodeURIComponent((data as any)?.url ?? '')}`);
+}
+
+/* ========================================================================== */
+/* Specifications                                                             */
+/* ========================================================================== */
+
+export async function saveModelSpec(formData: FormData): Promise<void> {
+  const modelId = String(formData.get('model') ?? '');
+
+  // Every attribute field is prefixed so it can be told apart from the rest of
+  // the form without knowing the attribute codes in advance.
+  const values: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith('attr_')) values[k.slice(5)] = String(v);
+  }
+
+  const { error } = await sb().rpc('set_model_attributes', {
+    p_model: modelId,
+    p_values: values,
+  });
+
+  revalidatePath('/catalog');
+  redirect(error
+    ? `/catalog/${modelId}?error=${encodeURIComponent(error.message)}`
+    : `/catalog/${modelId}?saved=1`);
+}
+
+export async function saveAssetAttribute(formData: FormData): Promise<void> {
+  const assetId = String(formData.get('asset') ?? '');
+  const { error } = await sb().rpc('set_asset_attribute', {
+    p_asset: assetId,
+    p_code: String(formData.get('code') ?? ''),
+    p_value: String(formData.get('value') ?? ''),
+    p_note: String(formData.get('note') ?? '') || null,
+  });
+  revalidatePath(`/assets/${assetId}`);
+  redirect(error
+    ? `/assets/${assetId}?error=${encodeURIComponent(error.message)}`
+    : `/assets/${assetId}?saved=1`);
+}
+
+export async function saveAttribute(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/catalog/attributes?error=' + encodeURIComponent('No company in scope.'));
+
+  const choices = String(formData.get('choices') ?? '')
+    .split('\n').map((s) => s.trim()).filter(Boolean);
+
+  const { error } = await supabase.rpc('upsert_attribute', {
+    p_company: co.id,
+    p_category: String(formData.get('category') ?? '') || null,
+    p_code: String(formData.get('code') ?? ''),
+    p_label: String(formData.get('label') ?? ''),
+    p_kind: String(formData.get('kind') ?? 'text'),
+    p_unit: String(formData.get('unit') ?? '') || null,
+    p_choices: choices,
+    p_required: formData.get('required') === 'on',
+    p_filterable: formData.get('filterable') === 'on',
+    p_help: String(formData.get('help') ?? '') || null,
+    p_sort: Number(formData.get('sort') ?? 100) || 100,
+  });
+
+  revalidatePath('/catalog/attributes');
+  redirect(error
+    ? `/catalog/attributes?error=${encodeURIComponent(error.message)}`
+    : '/catalog/attributes?saved=1');
+}
+
+export async function deleteAttribute(id: string): Promise<void> {
+  const { error } = await sb().rpc('delete_attribute', { p_id: id });
+  revalidatePath('/catalog/attributes');
+  redirect(error
+    ? `/catalog/attributes?error=${encodeURIComponent(error.message)}`
+    : '/catalog/attributes?deleted=1');
+}
+
+export async function seedAttributes(): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/catalog/attributes?error=' + encodeURIComponent('No company in scope.'));
+  const { data, error } = await supabase.rpc('seed_attributes', { p_company: co.id });
+  revalidatePath('/catalog/attributes');
+  redirect(error
+    ? `/catalog/attributes?error=${encodeURIComponent(error.message)}`
+    : `/catalog/attributes?seeded=${data ?? 0}`);
+}
+
+/**
+ * Applying a starter pack.
+ *
+ * Distinct from seedAttributes, which matches attributes onto categories a
+ * company already has. A pack creates the category, a type under it, and the
+ * attributes together — for a company starting from nothing, which is most of
+ * them on day one.
+ */
+export async function applyAttributePack(pack: string): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/catalog/attributes?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('apply_attribute_pack', {
+    p_company: co.id,
+    p_pack: pack,
+  });
+
+  revalidatePath('/catalog/attributes');
+  revalidatePath('/catalog');
+  redirect(error
+    ? `/catalog/attributes?error=${encodeURIComponent(error.message)}`
+    : `/catalog/attributes?pack=${encodeURIComponent((data as any)?.category ?? pack)}`);
 }

@@ -622,6 +622,179 @@ identical from outside: nothing changes. So `/diagnostics` now checks each
 separately and says which one broke, including fetching the logo to confirm the
 bucket actually serves it.
 
+## Storage: Cloudflare R2
+
+R2 when configured, Supabase Storage otherwise, both behind
+`src/lib/storage.ts` so nothing else knows which is in use. Egress is free,
+which matters because logos are fetched on every page load by every user — a
+bucket that charges for reads turns a branding feature into a line item.
+
+**The trade-off is real and worth naming.** Supabase Storage policies could
+query `app.memberships` directly, so a private file had two independent locks:
+the application checked permission and the storage layer checked it again. R2
+has no idea who the user is, so permission is checked once, before a signature
+is issued. That is how most systems work, and it is fine — but it is one lock
+rather than two.
+
+What compensates, all asserted by `tests-storage.mjs` in CI:
+
+- The company is derived from the caller's memberships and **never read from
+  the request** — otherwise anyone could name somebody else's company and be
+  handed a URL writing into their folder.
+- Ten minutes to upload, **two minutes** to read a receipt.
+- Keys namespaced by company, so a leaked key exposes one object rather than a
+  listing.
+- Only `branding/` is public, and a public asset is refused a signature —
+  a printed waybill must not stop working when a signature expires.
+- The browser client contains no access-control logic at all.
+
+Setup is in `backend/STORAGE.md`. Leave the R2 variables unset and everything
+falls back to Supabase Storage with no code change.
+
+## Free accounts (0021)
+
+**One switch turns billing off for the whole platform**, and it is off by
+default — a billing system that is on by default is one that charges somebody
+during a trial by accident. While it is off, `begin_payment()` refuses, the
+billing page shows the free notice instead of an amount, and the payment card
+is not rendered at all. Showing a "you owe" figure nobody will collect is the
+fastest way to make a free product feel like a trap.
+
+The page still computes `would_cost_minor` and labels it plainly, so nothing is
+a surprise later.
+
+**Comped accounts survive the switch being turned back on.** An early customer
+promised free access should not discover an invoice the day billing starts, so
+the exemption is a recorded fact on the company with a reason and an optional
+expiry — not an absence of a subscription row. Granting or ending it writes to
+**that company's own audit log**: if we change what somebody pays, they see it.
+
+**`provision_company()` creates a working company for someone who has not
+signed up** — profile, company, owner membership, virtual warehouse, optionally
+comped. The first customers are onboarded in a conversation rather than through
+a form, and doing that by hand in SQL is how a company ends up without an owner
+or without its virtual warehouse.
+
+It cannot create the login: passwords and confirmation emails are Supabase
+Auth's job, and duplicating that would mean holding a credential we have no
+business holding. If no account exists it refuses and says exactly what to do.
+
+`/admin/companies` shows every company's name, size and plan — and nothing
+else. Verified: a reviewer sees the list and still reads zero assets from a
+company they are not in.
+
+### A duplicate migration, found while building this
+
+There were two files numbered `0019` — `bank_transfer` and `manual_payments` —
+implementing the same feature two different ways, with `actions.ts` calling
+functions from both. Two files with the same number apply in whatever order the
+shell happens to glob them, which is not a thing to leave in a repository. The
+orphaned migration and its two dead actions are gone; the pages only ever used
+the surviving one.
+
+## Specifications (0022)
+
+`models.specs` was a freeform jsonb array, so one person typed "24 inch",
+another `24"`, a third "610mm". Nothing could be filtered or totalled, and in
+practice nobody filled it in — an empty box with no label is an invitation to
+skip.
+
+Attributes are now **defined per category, once**. A chair is never asked for a
+processor; a computer is never asked for upholstery. The form for a new model is
+generated from its category, which makes it short, obviously relevant and
+answerable — and every answer lands in the same typed field, so it is comparable
+across models.
+
+Five kinds: text, number, dimension, choice, boolean. A choice with fewer than
+two options is rejected by a constraint, because a choice field with one option
+is a text box wearing a costume, and comparability is the entire point.
+
+**Three levels, and the third matters most.** Category defines what to ask,
+the model holds the answer all units share, and an **asset override** holds
+what is true of one unit alone. Without that third level somebody edits the
+model to record an upgraded machine and silently changes the description of
+forty others. The asset page shows which is which:
+
+    Memory   16 GB   [This unit only]   Upgraded March 2026
+    Screen   24 in   [Model]
+
+A starter set is offered based on the categories a company already has —
+computers get processor and memory, furniture gets material and dimensions.
+
+Two bugs worth recording:
+
+- The seed matched category names with `'comput|it|electron'`, and the
+  unanchored `it` matched **furn*it*ure** — so chairs were asked for a
+  processor. Word boundaries now.
+- `model_specification` mixed a comma-join with a LEFT JOIN, which puts the
+  earlier table out of scope. Postgres rejected it outright, which is the good
+  case; a CROSS JOIN fixes it.
+
+`docs/ASSETS-INVENTORY-CATALOG.md` explains the three concepts for whoever ends
+up administering this.
+
+## Running free (0021)
+
+Billing ships **off**. `billing_enabled` is false by default, deliberately: a
+billing system that is on by default is one somebody forgets to check before
+inviting their first customer.
+
+While it is off every company costs ₦0 whatever its asset count, the billing
+page says so plainly, and `begin_payment()` refuses rather than sending
+somebody to Paystack for an amount the system does not believe in. The summary
+still computes `would_cost_minor`, so you can see what a company *would* pay
+without charging them.
+
+**Comping is separate from the switch**, and that is the point — an early
+customer promised free access should not start receiving invoices the day you
+decide to charge everyone else. Verified: with billing off a 125-asset company
+owes ₦0; switched on, the same company owes ₦22,500 while a comped one still
+owes nothing.
+
+**Provisioning** creates a company for somebody who never signed up, for when
+the sales conversation already happened. Two steps on purpose: the auth user is
+created in the Supabase dashboard, because creating one needs the service role
+key and putting that key behind a page any reviewer can reach is one bug away
+from an open account-creation endpoint.
+
+A provisioned owner sees their own company and nothing else — checked by the
+same assertions that check it for everyone else. `docs/RUNNING-FREE.md` has the
+steps.
+
+## Catalog, assets, inventory (0022–0023)
+
+The three are not obvious from the words, and getting them wrong is expensive
+to undo — so the distinction is now stated in the app, collapsed by default, on
+both the catalog and inventory pages where the confusion actually happens.
+
+**Catalog** is the description, written once. **Assets** are the individual
+things, each with its own tag, serial, location and history. **Inventory** is
+the countable stuff, where one unit is interchangeable with any other.
+
+The test: would you ever ask *"where is that specific one?"* If yes it is an
+asset. `classification_hint()` warns — not refuses — when somebody creates a
+stock item called "laptop", because a company that genuinely counts its chairs
+is not wrong, and being told it is wrong by software is how people stop reading
+messages.
+
+**Attributes are defined per category**, so a chair never asks for a processor.
+Three levels, and the third matters most: category attributes say what any
+thing of this kind has, model values say what this kind has, and asset
+overrides say what is true of one unit and nothing else. Without that third
+level somebody upgrading one machine's memory edits the model and silently
+changes the description of forty others. Verified: one unit reads 16GB, its
+siblings still read 8, and the model is untouched.
+
+**Starter packs** (0023) were the missing half. 0022 built the mechanism but
+left a new company facing an empty attribute editor — which is exactly as
+useless as the freeform text box it replaced, because somebody has to invent
+"what does a chair have?" before describing a single chair. Seven packs now
+create the category, a type under it, and five or six fields together.
+
+They are short on purpose. Fifteen attributes on a chair means nobody fills any
+in; six means the form is answerable in a minute, and six filled fields beat
+fifteen empty ones.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

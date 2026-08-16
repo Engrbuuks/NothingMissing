@@ -33,7 +33,20 @@ export default function Pricing() {
           ))}
         </div>
 
-        <div className="mkt-card" style={{ marginTop: 34 }}>
+        <div className="mkt-card" style={{ marginTop: 34, borderColor: 'var(--brand)' }}>
+          <h3>Right now, all of it is free</h3>
+          <p>
+            We are working with our first customers, and nobody is being charged anything
+            while we do. Not a trial with a date on it — genuinely free, with nothing
+            restricted and no card asked for.
+          </p>
+          <p style={{ marginTop: 12 }}>
+            The prices below are what we expect to charge eventually. You will be told well
+            before that changes, and companies who start with us now keep their access.
+          </p>
+        </div>
+
+        <div className="mkt-card" style={{ marginTop: 18 }}>
           <h3>Being straight about this number</h3>
           <p>
             ₦180 per asset per month is where we have started, not where we have landed. For a

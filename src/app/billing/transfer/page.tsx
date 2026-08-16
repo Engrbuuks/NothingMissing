@@ -91,7 +91,6 @@ export default async function TransferPage({
             </div>
           </div>
           <ReceiptUpload
-            companyId={(co as any)?.id}
             defaultAmount={owed > 0 ? Math.round(owed / 100) : undefined}
             action={submitPaymentProof}
           />

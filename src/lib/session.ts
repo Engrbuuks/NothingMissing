@@ -34,11 +34,25 @@ export type Tenant = {
   logo_path: string | null;
 };
 
-/** Public URL for a company logo in the `branding` bucket. */
+/**
+ * Public URL for a company logo.
+ *
+ * Handles both shapes: an R2 key is prefixed `branding/`, a Supabase path is
+ * not, and existing rows may be either. Working that out here means nothing
+ * else has to care which storage a company's logo was uploaded to.
+ */
 export function logoUrl(path: string | null | undefined): string | null {
   if (!path) return null;
+
+  const r2Base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE;
+  if (r2Base) {
+    return `${r2Base.replace(/\/$/, '')}/${path.replace(/^branding\//, '')}`;
+  }
+
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return base ? `${base}/storage/v1/object/public/branding/${path}` : null;
+  if (!base) return null;
+  const clean = path.replace(/^branding\//, '');
+  return `${base}/storage/v1/object/public/branding/${clean}`;
 }
 
 export type Session = {

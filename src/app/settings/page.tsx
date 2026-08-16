@@ -112,7 +112,11 @@ export default async function Settings({
               </div>
             </div>
           </div>
-          <LogoUpload companyId={c.id} current={c.logo_path} action={saveLogo} />
+          <LogoUpload
+            current={c.logo_path}
+            publicBase={process.env.NEXT_PUBLIC_R2_PUBLIC_BASE ?? null}
+            action={saveLogo}
+          />
         </div>
       )}
 

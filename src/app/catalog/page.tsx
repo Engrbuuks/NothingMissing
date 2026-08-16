@@ -67,6 +67,46 @@ export default async function Catalog({
       title="Catalog"
       subtitle={`${categories.length} categories · ${brandList.length} brands · ${modelList.length} models`}
     >
+      {/* The distinction between the three is not obvious from the words, and
+          getting it wrong is expensive to undo — so it is stated on the page
+          rather than left for somebody to work out or ask about. */}
+      <details className="explain">
+        <summary>Catalog, assets, inventory — which is which?</summary>
+        <div className="explain-body">
+          <div className="explain-grid">
+            <div>
+              <h4>Catalog — the description</h4>
+              <p>
+                Written once. <b>Lenovo ThinkCentre M90a, all-in-one, i5, 16GB, 23.8-inch.</b>
+                You own forty of them; the catalog holds one row. Change the specification
+                here and all forty inherit it.
+              </p>
+            </div>
+            <div>
+              <h4>Assets — the individual things</h4>
+              <p>
+                Forty rows, each with its own tag, serial, location and history. NM-00041 is
+                at Ibadan with Adeola; NM-00042 is in repair. Same model, different lives.
+              </p>
+            </div>
+            <div>
+              <h4>Inventory — the countable stuff</h4>
+              <p>
+                Diesel, filters, gloves. One litre is interchangeable with any other, so you
+                count it rather than tracking each one. There is no &ldquo;where is that
+                specific litre&rdquo;.
+              </p>
+            </div>
+          </div>
+          <p className="explain-test">
+            <b>The test:</b> would you ever ask &ldquo;where is <i>that specific one</i>?&rdquo;
+            If yes it is an asset. If you only ever say &ldquo;we have about forty&rdquo;, it
+            is inventory. The catalog describes either kind, so you write the specification
+            once instead of forty times.
+          </p>
+        </div>
+      </details>
+
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Added to the catalog.</p></div>}
       {searchParams.deleted && <div className="notice"><p>Removed. Nothing was using it.</p></div>}
@@ -84,6 +124,7 @@ export default async function Catalog({
         </select>
         <button className="btn btn-g" type="submit">Apply</button>
         {filtered && <a className="btn btn-g" href="/catalog">Clear</a>}
+        <a className="btn btn-g" href="/catalog/attributes">Description fields</a>
       </form>
 
       {unlinked > 0 && (
@@ -134,12 +175,14 @@ export default async function Catalog({
                   return (
                     <tr key={m.id}>
                       <td>
-                        <div className="aname">{m.brands?.name ? `${m.brands.name} ` : ''}{m.name}</div>
+                        <a href={`/catalog/${m.id}`} style={{ display: 'block' }}>
+                          <div className="aname">{m.brands?.name ? `${m.brands.name} ` : ''}{m.name}</div>
                         <div className="amake">
                           {Array.isArray(m.specs) && m.specs.length
                             ? m.specs.slice(0, 2).map((s: any) => `${s[0]}: ${s[1]}`).join(' · ')
                             : 'No specification recorded'}
-                        </div>
+                          </div>
+                        </a>
                       </td>
                       <td>
                         <span className="pill" style={{ background: c + '1A', color: c }}>

@@ -1,9 +1,9 @@
-import { Wordmark, Mark } from '@/components/Mark';
+import { Wordmark } from '@/components/Mark';
 
 /**
- * The marketing site, on the apex. A tenant lives at its own subdomain, so
- * nothing here shares a layout with the application — different audience,
- * different job.
+ * The marketing site, on the apex. Deliberately not the application's visual
+ * language: this is read once by a stranger deciding whether to trust us,
+ * where the app is looked at every day by someone who already has.
  */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +14,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Wordmark size={19} />
           </a>
           <nav className="mkt-links">
+            <a href="/home">Overview</a>
             <a href="/pricing">Pricing</a>
             <a href="/security">Security</a>
             <a href="/about">About</a>
@@ -29,25 +30,49 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
       <footer className="mkt-foot">
         <div className="mkt-wrap">
-          <div>
-            <div style={{ marginBottom: 12 }}>
-              <Wordmark size={18} />
+          <div className="foot-grid">
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <Wordmark size={18} />
+              </div>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', maxWidth: 280, lineHeight: 1.62 }}>
+                Asset and inventory management for companies running depots, branches and
+                site offices.
+              </p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 12, lineHeight: 1.62 }}>
+                Lagos, Nigeria
+                <br />
+                <a href="mailto:hello@nothingmissing.ng" style={{ color: 'var(--brand)' }}>
+                  hello@nothingmissing.ng
+                </a>
+              </p>
             </div>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', maxWidth: 260, lineHeight: 1.6 }}>
-              Asset and inventory management for companies running depots, branches and site
-              offices. Lagos, Nigeria.
-            </p>
-          </div>
-          <div className="mkt-foot-links">
-            <a href="/pricing">Pricing</a>
-            <a href="/security">Security</a>
-            <a href="/about">About</a>
-            <a href="/sign-in">Sign in</a>
-            <a href="/terms">Terms</a>
-            <a href="/privacy">Privacy</a>
+
+            <div className="foot-col">
+              <h5>Product</h5>
+              <a href="/home">Overview</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/security">Security</a>
+              <a href="/sign-up">Start free</a>
+            </div>
+
+            <div className="foot-col">
+              <h5>Company</h5>
+              <a href="/about">About</a>
+              <a href="mailto:hello@nothingmissing.ng">Contact</a>
+              <a href="/sign-in">Sign in</a>
+            </div>
+
+            <div className="foot-col">
+              <h5>Legal</h5>
+              <a href="/terms">Terms</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/security">Data protection</a>
+            </div>
           </div>
         </div>
-        <div className="mkt-wrap" style={{ borderTop: '1px solid var(--line)', paddingTop: 18, marginTop: 26 }}>
+
+        <div className="mkt-wrap" style={{ borderTop: '1px solid var(--line)', paddingTop: 18, marginTop: 30 }}>
           <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
             © {new Date().getFullYear()} Nothing Missing · nothingmissing.ng
           </p>

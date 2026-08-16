@@ -21,10 +21,16 @@ export async function GET(request: Request) {
   const { data: me } = await supabase.from('platform_reviewers').select('user_id').maybeSingle();
   if (!me) return new Response('Not permitted', { status: 403 });
 
-  const { data, error } = await supabase.storage
-    .from('receipts')
-    .createSignedUrl(path, 120);   // two minutes is enough to look at it
+  // R2 when configured, Supabase Storage otherwise — the reviewer check above
+  // is the same either way, because it is the one that actually decides.
+  const { usingR2, signDownload } = await import('@/lib/storage');
 
+  if (usingR2()) {
+    const key = path.startsWith('receipts/') ? path : `receipts/${path}`;
+    return Response.redirect(await signDownload(key), 302);
+  }
+
+  const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 120);
   if (error || !data) {
     return new Response(`Could not open that receipt: ${error?.message ?? 'unknown'}`, { status: 404 });
   }

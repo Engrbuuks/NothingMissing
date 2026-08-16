@@ -18,6 +18,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
           NEXT_PUBLIC_ROOT_DOMAIN: nothingmissing.ng
 
+      # The storage layer is where all file access control now lives, because
+      # R2 cannot check it a second time the way Supabase policies did.
+      - name: storage access control
+        run: node tests-storage.mjs
+
   database:
     name: schema, RLS and 271 assertions
     runs-on: ubuntu-latest

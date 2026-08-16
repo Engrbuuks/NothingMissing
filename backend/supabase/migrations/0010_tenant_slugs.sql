@@ -43,7 +43,7 @@ insert into app.reserved_slugs (slug, reason) values
   ('sign-in','product route'), ('signin','product route'), ('login','product route'),
   ('signup','product route'), ('register','product route'), ('logout','product route'),
   ('reset','product route'), ('invite','product route'), ('join','product route'), ('sign-up','product route'), ('onboarding','product route'),
-  ('pricing','marketing'), ('about','marketing'), ('blog','marketing'),
+  ('home','marketing'), ('pricing','marketing'), ('about','marketing'), ('blog','marketing'),
   ('docs','marketing'), ('help','marketing'), ('legal','marketing'),
   ('privacy','marketing'), ('terms','marketing'), ('contact','marketing'),
   ('status','marketing'), ('security','marketing'), ('waybill','product route'), ('field','product route'),

@@ -83,6 +83,23 @@ export default async function Inventory({
 
   return (
     <Shell current="inventory" title="Inventory" subtitle={`Consumable stock ${where}`}>
+      <details className="explain">
+        <summary>Should this be inventory or an asset?</summary>
+        <div className="explain-body">
+          <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65 }}>
+            Inventory is for things that are interchangeable — one litre of diesel is like any
+            other, one box of gloves like the next. You count them.
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, marginTop: 10 }}>
+            Anything you would ever ask <b>&ldquo;where is that specific one?&rdquo;</b> about
+            belongs on the <a href="/assets" style={{ textDecoration: 'underline' }}>asset
+            register</a> instead — a laptop, a generator, a vehicle. Put one here and it
+            becomes a number: no serial, no location history, no custody chain, and no way to
+            answer a question about it a year later.
+          </p>
+        </div>
+      </details>
+
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Stock item added.</p></div>}
       {searchParams.deleted && <div className="notice"><p>Done.</p></div>}

@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canSeeFinancials, canWrite, money } from '@/lib/session';
-import { handOver, disposeAsset } from '@/lib/actions';
+import { handOver, disposeAsset, saveAssetAttribute } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +83,10 @@ export default async function AssetDetail({
 
   // The custody chain. This is what someone screenshots when there is a
   // dispute, so it gets room and reads in plain language.
+  const { data: spec } = await supabase.rpc('asset_specification', { p_asset: params.id });
+  const specRows = (spec ?? []) as any[];
+  const recorded = specRows.filter((r) => r.value);
+
   const { data: events } = await supabase
     .from('audit_events')
     .select('id, occurred_at, actor_label, action, detail, reference, tone')
@@ -243,6 +247,83 @@ export default async function AssetDetail({
             </div>
             <button className="btn btn-p" type="submit">Record the handover</button>
           </form>
+        </div>
+      )}
+
+      {specRows.length > 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">Specification</div>
+              <div className="card-s">
+                Inherited from the catalog model, except where this particular unit differs
+              </div>
+            </div>
+            {a.models && (
+              <a className="btn btn-g" href={`/catalog/${a.models?.id}`} style={{ marginLeft: 'auto' }}>
+                Edit the model
+              </a>
+            )}
+          </div>
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr><th>Field</th><th>Value</th><th>From</th></tr>
+              </thead>
+              <tbody>
+                {specRows.map((r) => (
+                  <tr key={r.code}>
+                    <td style={{ color: 'var(--text-3)', width: 200 }}>{r.label}</td>
+                    <td>
+                      {r.value ? (
+                        <>
+                          <b>{r.value}</b>
+                          {r.unit && <span style={{ color: 'var(--text-3)' }}> {r.unit}</span>}
+                          {r.note && <div className="amake" style={{ marginTop: 3 }}>{r.note}</div>}
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--text-3)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      {r.source === 'this unit' ? (
+                        <span className="pill p-warn"><span className="pd" />This unit only</span>
+                      ) : r.source === 'model' ? (
+                        <span className="pill p-mute">Model</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>not recorded</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {canWrite(session) && (
+            <form action={saveAssetAttribute}
+                  style={{ padding: 20, borderTop: '1px solid var(--line-2)', display: 'grid', gap: 12 }}>
+              <input type="hidden" name="asset" value={params.id} />
+              <div className="card-t" style={{ fontSize: 14 }}>Record a difference</div>
+              <p className="hint" style={{ marginTop: -4 }}>
+                Only for something true of this unit and not of the model — memory upgraded,
+                reupholstered in a different fabric. Changing the model would silently rewrite
+                the description of every other unit.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <select className="inp" name="code" required style={{ flex: 1, minWidth: 160 }}>
+                  {specRows.map((r) => (
+                    <option key={r.code} value={r.code}>{r.label}</option>
+                  ))}
+                </select>
+                <input className="inp" name="value" placeholder="New value"
+                       style={{ flex: 1, minWidth: 140 }} />
+                <input className="inp" name="note" placeholder="Why, and when"
+                       style={{ flex: 1, minWidth: 160 }} />
+                <button className="btn btn-p" type="submit">Record it</button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 

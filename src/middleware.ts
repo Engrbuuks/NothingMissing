@@ -21,7 +21,7 @@ const RESERVED = new Set([
   'www','app','api','admin','cdn','static','assets','mail','smtp','ftp',
   'ns1','ns2','mx','dev','staging','test','demo','sandbox','l','s',
   'sign-in','signin','login','signup','sign-up','register','logout','reset','invite','join',
-  'onboarding','field','pricing','about','blog','docs','help','legal',
+  'onboarding','field','home','pricing','about','blog','docs','help','legal',
   'privacy','terms','contact','status','security','waybill',
   'support','billing','account','accounts','nothingmissing','official',
   'system','root','noreply','security-team',

@@ -67,7 +67,26 @@ export default async function Billing({
       )}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
-      {s.status === 'trialing' && trialDays !== null && (
+      {/* While billing is off, this is the only thing a company should read
+          on this page. Showing a "you owe" figure that nobody will collect is
+          the fastest way to make a free product feel like a trap. */}
+      {!s.billing_live && (
+        <div className="notice">
+          <p>
+            <b>Nothing Missing is free at the moment.</b> {s.free_notice}
+          </p>
+        </div>
+      )}
+      {s.billing_live && s.comped && (
+        <div className="notice">
+          <p>
+            <b>Your account is free.</b> {s.comped_reason ?? 'Agreed with us directly'}
+            {s.comped_until ? `, until ${s.comped_until}.` : ', with no end date.'}{' '}
+            You will be told well before that changes.
+          </p>
+        </div>
+      )}
+      {s.billing_live && !s.comped && s.status === 'trialing' && trialDays !== null && (
         <div className="notice">
           <p>
             <b>{trialDays > 0 ? `${trialDays} days left in your trial.` : 'Your trial has ended.'}</b>{' '}
@@ -82,7 +101,15 @@ export default async function Billing({
           { v: String(s.assets ?? 0), l: 'Assets on the register', c: '#5B4BE8', s: '#EEEBFE' },
           { v: String(s.free_allowance ?? 50), l: 'Included free', c: '#0FA45E', s: '#E4F7ED' },
           { v: String(s.billable ?? 0), l: 'Chargeable', c: '#E39A11', s: '#FDF3E0' },
-          { v: money(s.monthly_minor ?? 0), l: 'Per month at today’s count', c: '#0EA5B7', s: '#E2F6F8' },
+          {
+            v: s.billing_live && !s.comped
+              ? money(s.monthly_minor ?? 0)
+              : money(0),
+            l: s.billing_live && !s.comped
+              ? 'Per month at today’s count'
+              : `Nothing to pay · would be ${money(s.would_cost_minor ?? 0)}`,
+            c: '#0EA5B7', s: '#E2F6F8',
+          },
         ].map((k) => (
           <div className="kpi" key={k.l}>
             <div className="kpi-top">
@@ -123,7 +150,7 @@ export default async function Billing({
         </div>
       </div>
 
-      {s.over_free_limit && (
+      {s.billing_live && !s.comped && s.over_free_limit && (
         <div className="notice warn">
           <p>
             <b>You are past the free allowance.</b> Nothing has been restricted and nothing
@@ -133,6 +160,7 @@ export default async function Billing({
         </div>
       )}
 
+      {s.billing_live && !s.comped && (
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-h bd">
           <div>
@@ -175,6 +203,7 @@ export default async function Billing({
           )}
         </div>
       </div>
+      )}
 
       {(proofs ?? []).length > 0 && (
         <div className="card" style={{ marginBottom: 18 }}>

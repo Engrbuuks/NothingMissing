@@ -1375,3 +1375,175 @@ body::before{
    rather than disappear into it. */
 .shell.theme-dark .donut-c circle:first-child{ stroke:rgba(255,255,255,.06) }
 .shell.theme-dark .stockbar,.shell.theme-dark .perf-bar{ background:#1E2E45 }
+
+/* ==========================================================================
+   Marketing, second pass.
+
+   The pattern: tinted bands alternating with white, a stats strip, icon grids
+   rather than paragraphs, and isometric artwork carrying the weight. Amber is
+   an illustration and accent colour only — it never appears as a brand colour,
+   because the brand is one blue and everything derives from it.
+   ========================================================================== */
+:root{
+  --amber:#F0A22E;
+  --amber-soft:#FDF0DC;
+  --mkt-tint:#EDF3FD;
+}
+
+.illus{ position:relative;width:100%;border-radius:18px;overflow:hidden }
+.illus img{ width:100%;height:100%;object-fit:contain;position:relative;z-index:1;display:block }
+/* A missing image paints nothing, so the placeholder underneath shows through
+   without needing an onError handler — which cannot cross the server boundary. */
+.illus img:not([src$=".png"]){ display:none }
+.illus-ph{ position:absolute;inset:0;display:grid;place-items:center;gap:4px;z-index:0;
+  background:repeating-linear-gradient(45deg,#EDF3FD,#EDF3FD 12px,#E4EDFB 12px,#E4EDFB 24px);
+  border-radius:18px;color:#7A8CA8;font-size:12.5px;text-align:center }
+.illus-ph b{ font-family:var(--mono);font-weight:600;display:block }
+.illus-ph i{ font-style:normal;font-size:11px;opacity:.7 }
+
+/* ---- hero ---- */
+.hro{ padding:56px 0 40px;position:relative;overflow:hidden }
+.hro-grid{ display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);
+  gap:44px;align-items:center }
+.hro h1{ font-size:46px;letter-spacing:-.045em;line-height:1.05 }
+.hro p{ font-size:16.5px;color:var(--text-2);line-height:1.65;margin-top:18px;max-width:52ch }
+.hro-cta{ display:flex;gap:11px;margin-top:28px;flex-wrap:wrap }
+
+/* ---- stats strip ---- */
+.stats{ background:var(--mkt-tint);border-radius:24px;padding:30px 34px;margin-top:8px }
+.stats-h{ display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap }
+.stats-h h3{ font-size:21px;letter-spacing:-.03em }
+.stats-h p{ font-size:13.5px;color:var(--text-2);margin-top:5px;max-width:46ch }
+.stats-row{ display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:2px;margin-top:26px;background:#D9E5F7;border-radius:14px;overflow:hidden }
+.stat{ background:var(--mkt-tint);padding:18px 20px }
+.stat b{ display:block;font-family:var(--display);font-size:31px;font-weight:800;
+  letter-spacing:-.045em;color:var(--brand) }
+.stat span{ display:block;font-size:12.5px;color:var(--text-2);margin-top:4px }
+
+/* ---- section heads ---- */
+.sec{ padding:66px 0 }
+.sec.tint{ background:var(--mkt-tint) }
+.sec-eyebrow{ display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--brand);margin-bottom:14px }
+.sec-eyebrow::before{ content:'';width:16px;height:2px;background:var(--amber);border-radius:2px }
+.sec h2{ font-size:33px;letter-spacing:-.04em;line-height:1.12;max-width:18ch }
+.sec-sub{ font-size:15.5px;color:var(--text-2);line-height:1.65;margin-top:14px;max-width:58ch }
+
+/* ---- feature grid ---- */
+.fgrid{ display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:34px 40px;margin-top:38px }
+.feat{ display:flex;gap:14px;align-items:flex-start }
+.feat-ic{ width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;
+  background:var(--brand-soft);color:var(--brand) }
+.feat-ic svg{ width:19px;height:19px }
+.feat h3{ font-size:16px;letter-spacing:-.02em;margin-bottom:6px }
+.feat p{ font-size:13.8px;color:var(--text-2);line-height:1.62 }
+
+/* ---- trust pills ---- */
+.pills{ display:flex;gap:9px;flex-wrap:wrap;margin-top:22px }
+.tpill{ display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);
+  border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:600 }
+.tpill i{ width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none }
+
+/* ---- split with overlay card ---- */
+.split{ display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:40px;
+  align-items:center;margin-top:40px }
+.ovcard{ background:var(--brand);color:#fff;border-radius:18px;padding:22px 24px;
+  box-shadow:0 24px 50px -34px var(--brand) }
+.ovcard h4{ color:#fff;font-size:16px;margin-bottom:8px }
+.ovcard p{ font-size:13.5px;line-height:1.62;color:rgba(255,255,255,.82) }
+
+/* ---- FAQ ---- */
+.faq{ display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:36px }
+.faq details{ background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+  transition:border-color .2s,box-shadow .2s }
+.faq details[open]{ border-color:var(--brand);box-shadow:0 14px 32px -28px var(--brand) }
+.faq summary{ font-size:14px;font-weight:600;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:12px }
+.faq summary::-webkit-details-marker{ display:none }
+.faq summary::after{ content:'+';margin-left:auto;font-size:19px;color:var(--brand);
+  font-weight:400;line-height:1;flex:none }
+.faq details[open] summary::after{ content:'–' }
+.faq p{ font-size:13.6px;color:var(--text-2);line-height:1.65;margin-top:11px }
+
+/* ---- newsletter / closing ---- */
+.close-band{ background:var(--mkt-tint);border-radius:26px;padding:38px 40px;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:34px;align-items:center }
+.close-band h2{ font-size:28px;letter-spacing:-.035em;max-width:16ch }
+.close-band p{ font-size:15px;color:var(--text-2);line-height:1.62;margin-top:12px;max-width:44ch }
+
+/* ---- footer ---- */
+.foot-grid{ display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:32px }
+.foot-col h5{ font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:12px }
+.foot-col a{ display:block;font-size:13px;color:var(--text-2);padding:4px 0 }
+.foot-col a:hover{ color:var(--brand) }
+
+@media(max-width:900px){
+  .hro-grid,.split,.close-band{ grid-template-columns:1fr }
+  .hro h1{ font-size:31px }
+  .sec h2{ font-size:24px;max-width:none }
+  .sec{ padding:46px 0 }
+  .stats{ padding:24px 20px }
+  .foot-grid{ grid-template-columns:1fr 1fr }
+}
+
+/* The stats strip is a fixed 4-up grid inside a padded card, which overflows a
+   narrow phone by about 68px. Two-up below 640, and the alt text on an
+   illustration must not force a minimum width. */
+@media(max-width:640px){
+  .stats-row{ grid-template-columns:repeat(2,1fr) }
+  .stats{ padding:20px 16px;border-radius:18px }
+  .stat{ padding:14px 14px }
+  .stat b{ font-size:25px }
+  .close-band{ padding:26px 20px;border-radius:20px }
+  .mkt-wrap{ padding:0 16px }
+  .illus img{ max-width:100% }
+  .illus-ph{ font-size:11px;padding:8px }
+  .faq{ grid-template-columns:1fr }
+  .foot-grid{ grid-template-columns:1fr;gap:24px }
+}
+/* Long single words in alt text or headings must never widen the page. */
+.illus,.stat,.feat,.tpill{ min-width:0 }
+.illus img{ overflow-wrap:anywhere }
+
+/* The header holds a wordmark, four links and two buttons. Below 820 the links
+   already hide; below 560 the wordmark's tagline and the secondary button go
+   too, leaving the mark, the name and one call to action — which is all a
+   phone header should carry anyway. */
+@media(max-width:560px){
+  .mkt-nav .mkt-wrap{ gap:12px;height:60px }
+  .mkt-cta{ gap:7px }
+  .mkt-cta .btn-g{ display:none }
+  .mkt-cta .btn{ padding:8px 13px;font-size:12.5px }
+  .mkt-brand span[style*="letter-spacing"]{ font-size:15px !important }
+}
+
+/* Starter packs. Laid out as a list rather than tiles: somebody is scanning
+   for the two or three that match what they own, and a grid of equal-weight
+   cards makes that harder rather than easier. */
+.packgrid{ padding:6px 0 }
+.pack{ display:flex;align-items:center;gap:14px;padding:14px 20px;
+  border-bottom:1px solid var(--line-2) }
+.pack:last-child{ border-bottom:none }
+.pack.done{ opacity:.6 }
+.pack-n{ font-size:13.5px;font-weight:600 }
+.pack-d{ font-size:12.5px;color:var(--text-3);margin-top:3px;line-height:1.45 }
+
+/* The explainer. Collapsed by default — somebody who already knows the
+   difference should not have to scroll past it every time, and somebody who
+   does not should find it exactly where the confusion happens. */
+.explain{ background:var(--brand-soft);border:1px solid var(--line);border-radius:16px;
+  padding:14px 18px;margin-bottom:18px }
+.explain summary{ font-size:13.5px;font-weight:600;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:10px;color:var(--brand-ink) }
+.explain summary::-webkit-details-marker{ display:none }
+.explain summary::after{ content:'+';margin-left:auto;font-size:18px;line-height:1;font-weight:400 }
+.explain[open] summary::after{ content:'–' }
+.explain-body{ padding-top:16px }
+.explain-grid{ display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px }
+.explain-grid h4{ font-size:13.5px;margin-bottom:6px }
+.explain-grid p{ font-size:12.8px;color:var(--text-2);line-height:1.6 }
+.explain-test{ font-size:12.8px;color:var(--text-2);line-height:1.6;margin-top:16px;
+  padding-top:14px;border-top:1px solid rgba(0,0,0,.07) }
