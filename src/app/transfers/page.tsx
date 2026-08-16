@@ -1,5 +1,6 @@
 import Shell from '@/components/Shell';
-import { sb, getSession } from '@/lib/session';
+import { deleteTransferDraft } from '@/lib/actions';
+import { sb, getSession, canWrite } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,9 +189,18 @@ export default async function Transfers({
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <a className="btn btn-g" href={`/transfers/${t.id}`}>
-                          Open
-                        </a>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <a className="btn btn-g" href={`/transfers/${t.id}`}>Open</a>
+                          {/* Only a draft. Once approved or dispatched it is a
+                              document, and documents are cancelled rather than
+                              deleted — the database enforces that too. */}
+                          {t.status === 'draft' && canWrite(session) && (
+                            <form action={deleteTransferDraft.bind(null, t.id)}>
+                              <button className="btn btn-g" type="submit"
+                                      style={{ color: 'var(--bad)' }}>Delete</button>
+                            </form>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

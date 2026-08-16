@@ -33,6 +33,11 @@ jobs:
       - name: pages match the schema
         run: node tests-schema.mjs
 
+      # Twice now, working database functions shipped with no page calling
+      # them — indistinguishable from not building the feature at all.
+      - name: every action is reachable from a page
+        run: node tests-reachable.mjs
+
   database:
     name: schema, RLS and 271 assertions
     runs-on: ubuntu-latest

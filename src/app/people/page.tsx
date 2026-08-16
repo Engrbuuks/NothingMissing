@@ -1,7 +1,8 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
 import { issueLink, revokeLink, setMemberRole, inviteMember,
-         revokeInvitation, resendInvitation } from '@/lib/actions';
+         revokeInvitation, resendInvitation, removeMember,
+         deleteLinkHolder } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,11 @@ export default async function People({
     ? await supabase.rpc('company_invitations', { p_company: (co2 as any).id })
     : { data: [] as any[] };
   const owners = ((members ?? []) as any[]).filter((m) => m.role === 'owner').length;
+
+  const { data: holders } = await supabase
+    .from('link_holders')
+    .select('id, name, role_label, phone, submissions_total, locations ( name )')
+    .order('name');
 
   const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
 
@@ -154,6 +160,15 @@ export default async function People({
                         <button className="btn btn-g" type="submit"
                                 style={{ padding: '6px 11px', fontSize: 12.5 }}>Set</button>
                       </form>
+                      {m.user_id !== session?.userId && (
+                        <form action={removeMember.bind(null, m.user_id)}
+                              style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
+                          <button className="btn btn-g" type="submit"
+                                  style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                            Remove from company
+                          </button>
+                        </form>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -162,6 +177,169 @@ export default async function People({
           </table>
         </div>
       </div>
+
+
+      {/* Inviting somebody to sign in. This existed in the database since 0014
+          but nothing on this page reached it, so in practice nobody but the
+          founder ever had an account. */}
+      {isAdmin && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">Invite someone to sign in</div>
+              <div className="card-s">
+                They get an account with their own password. Somebody who only submits
+                counts should get a field link below instead — no account needed.
+              </div>
+            </div>
+          </div>
+
+          {searchParams.invite && (
+            <div className="notice" style={{ margin: 16 }}>
+              <p style={{ marginBottom: 8 }}>
+                <b>Send them this link.</b> It works once, expires in 14 days, and only opens
+                for the address you sent it to.
+              </p>
+              <code className="mono" style={{ display: 'block', wordBreak: 'break-all',
+                    background: 'var(--surface)', padding: '10px 12px', borderRadius: 10,
+                    fontSize: 12.5, border: '1px solid var(--line)' }}>
+                https://{root}{searchParams.invite}
+              </code>
+              <p className="hint" style={{ marginTop: 8 }}>
+                Shown once — only a hash is stored, so it cannot be retrieved later.
+              </p>
+            </div>
+          )}
+
+          <form action={inviteMember} style={{ padding: 20, display: 'grid', gap: 14 }}>
+            <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
+              <div>
+                <label className="lbl" htmlFor="inv-email">Their email</label>
+                <input className="inp" id="inv-email" name="email" type="email" required
+                       placeholder="name@company.com" />
+                <div className="hint">The invitation only opens for this exact address.</div>
+              </div>
+              <div>
+                <label className="lbl" htmlFor="inv-role">Role</label>
+                <select className="inp" id="inv-role" name="role" defaultValue="requester">
+                  {hasRole(session, 'owner') && <option value="owner">Owner</option>}
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="requester">Requester</option>
+                  <option value="auditor">Auditor</option>
+                </select>
+                <div className="hint">What each role can do is in the table above.</div>
+              </div>
+              <div>
+                <label className="lbl" htmlFor="inv-loc">Location</label>
+                <select className="inp" id="inv-loc" name="location" defaultValue="">
+                  <option value="">All locations</option>
+                  {(locations ?? []).map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+                <div className="hint">Owners and admins always see everything.</div>
+              </div>
+            </div>
+            <div><button className="btn btn-p" type="submit">Create the invitation</button></div>
+          </form>
+
+          {((invites ?? []) as any[]).length > 0 && (
+            <div className="tbl-wrap" style={{ borderTop: '1px solid var(--line-2)' }}>
+              <table>
+                <thead><tr><th>Invited</th><th>Role</th><th>Covers</th><th>Status</th><th /></tr></thead>
+                <tbody>
+                  {((invites ?? []) as any[]).map((i) => (
+                    <tr key={i.id}>
+                      <td>
+                        <div className="aname">{i.email}</div>
+                        <div className="amake">by {i.invited_by ?? '—'}</div>
+                      </td>
+                      <td><span className="pill p-mute">{i.role}</span></td>
+                      <td style={{ color: 'var(--text-2)' }}>{i.location ?? 'All locations'}</td>
+                      <td>
+                        <span className={`pill ${
+                          i.state === 'accepted' ? 'p-ok'
+                          : i.state === 'expired' || i.state === 'withdrawn' ? 'p-bad'
+                          : i.state === 'expiring' ? 'p-warn' : 'p-sky'}`}>
+                          <span className="pd" />{i.state}
+                        </span>
+                        {i.state === 'waiting' && (
+                          <div className="amake" style={{ marginTop: 3 }}>
+                            {i.days_left} day{i.days_left === 1 ? '' : 's'} left
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {i.state !== 'accepted' && (
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <form action={resendInvitation.bind(null, i.id)}>
+                              <button className="btn btn-g" type="submit"
+                                      style={{ padding: '5px 10px', fontSize: 12 }}>Resend</button>
+                            </form>
+                            {i.state === 'waiting' && (
+                              <form action={revokeInvitation.bind(null, i.id)}>
+                                <button className="btn btn-g" type="submit"
+                                        style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                                  Withdraw
+                                </button>
+                              </form>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* The people who hold links but have no account. Kept separate from
+          members because they are a different kind of relationship: named, but
+          never signed in. */}
+      {isAdmin && ((holders ?? []) as any[]).length > 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">People who hold links</div>
+              <div className="card-s">
+                No account, but every submission carries their name — which is why they can
+                only be removed if they have never submitted anything.
+              </div>
+            </div>
+          </div>
+          <div className="tbl-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Role</th><th>Location</th><th>Submitted</th><th /></tr></thead>
+              <tbody>
+                {((holders ?? []) as any[]).map((h) => (
+                  <tr key={h.id}>
+                    <td>
+                      <div className="aname">{h.name}</div>
+                      <div className="amake">{h.phone ?? ''}</div>
+                    </td>
+                    <td style={{ color: 'var(--text-2)' }}>{h.role_label ?? '—'}</td>
+                    <td style={{ color: 'var(--text-2)' }}>{h.locations?.name ?? '—'}</td>
+                    <td className="mono">{h.submissions_total}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <form action={deleteLinkHolder.bind(null, h.id)}>
+                        <button className="btn btn-g" type="submit"
+                                style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                          Remove
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-h bd">

@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
-import { sb, canSeeFinancials, getSession } from '@/lib/session';
-import { createSupplier } from '@/lib/actions';
+import { sb, canSeeFinancials, getSession, canWrite } from '@/lib/session';
+import { createSupplier, deleteSupplier, archiveSupplier } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +69,22 @@ export default async function Suppliers({
                       <td className="mono">{l?.orders ?? 0}</td>
                       <td className="mono">{l?.avg_days ? `${l.avg_days} days` : '—'}</td>
                       <td className="mono" style={{ color: 'var(--text-3)' }}>{l?.worst_days ? `${l.worst_days} days` : '—'}</td>
+                      {canWrite(session) && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <form action={archiveSupplier.bind(null, s.id)}>
+                              <button className="btn btn-g" type="submit"
+                                      style={{ padding: '5px 10px', fontSize: 12 }}>Archive</button>
+                            </form>
+                            <form action={deleteSupplier.bind(null, s.id)}>
+                              <button className="btn btn-g" type="submit"
+                                      style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                                Delete
+                              </button>
+                            </form>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

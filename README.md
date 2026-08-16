@@ -893,6 +893,22 @@ while the display name changes.
 promote a second owner early: only an owner can make another owner, so a single
 owner leaving makes the company unadministrable.
 
+## The gap that kept recurring
+
+Twice I shipped working database functions with no page calling them, told you
+it was built, and it was not. Invitations were the second time: `invite_member()`,
+`accept_invitation()` and `/join` all worked, and the People page reached none
+of them.
+
+From a user's seat that is indistinguishable from never building the feature.
+
+`tests-reachable.mjs` now walks every exported server action and fails if no
+page references it. Running it the first time found six more: draft transfer
+deletion, supplier delete and archive, link-holder removal, member removal, and
+a superseded import path left behind by 0024. All six are now wired or removed.
+
+It runs in CI, so this specific failure cannot ship again.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

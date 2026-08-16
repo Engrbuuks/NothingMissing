@@ -358,63 +358,7 @@ export async function createSupplier(formData: FormData): Promise<void> {
   redirect('/suppliers?added=1');
 }
 
-export async function importAssets(formData: FormData): Promise<void> {
-  const raw = String(formData.get('csv') ?? '').trim();
-  const location = String(formData.get('location') ?? '');
-  if (!raw || !location) {
-    redirect('/import?error=' + encodeURIComponent('Paste some rows and choose a location.'));
-  }
 
-  const supabase = sb();
-  const { data: loc } = await supabase
-    .from('locations')
-    .select('id, company_id')
-    .eq('id', location)
-    .single();
-  if (!loc) redirect('/import?error=' + encodeURIComponent('That location could not be read.'));
-
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
-  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
-  const idx = (name: string) => header.indexOf(name);
-  const iTag = idx('tag');
-  const iName = idx('name');
-  const iSerial = idx('serial');
-
-  if (iTag < 0 || iName < 0) {
-    redirect(
-      '/import?error=' +
-        encodeURIComponent('The first row must name the columns, and must include tag and name.')
-    );
-  }
-
-  const rows = lines.slice(1).map((l) => {
-    const c = l.split(',').map((x) => x.trim());
-    return {
-      company_id: loc.company_id,
-      location_id: loc.id,
-      tag: c[iTag],
-      name: c[iName],
-      serial_no: iSerial >= 0 ? c[iSerial] || null : null,
-      status: 'active' as const,
-    };
-  });
-
-  // Insert as one statement so a duplicate tag or serial anywhere rejects the
-  // whole batch. A half-imported register is worse than none: you cannot tell
-  // which rows are real without re-reading the spreadsheet line by line.
-  const { error } = await supabase.from('assets').insert(rows);
-
-  revalidatePath('/assets');
-  if (error) {
-    redirect(
-      '/import?error=' +
-        encodeURIComponent(
-          `${error.message} — nothing was imported. Fix the row and paste again.`
-        )
-    );
-  }
-  redirect(`/assets?imported=${rows.length}`);
-}
 
 /* ========================================================================== */
 /* Final: asset detail, requests, custody, settings                           */
