@@ -1,4 +1,5 @@
 import { sb, logoUrl } from '@/lib/session';
+import { reissueWaybill } from '@/lib/actions';
 import { Mark } from '@/components/Mark';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,13 @@ export default async function Waybill({ params }: { params: { id: string } }) {
         <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
           Use your browser&rsquo;s print dialogue and choose &ldquo;Save as PDF&rdquo;
         </span>
-        <a className="btn btn-p" href="?print=1" style={{ marginLeft: 'auto' }}>Print</a>
+        <form action={reissueWaybill.bind(null, params.id)} style={{ marginLeft: 'auto' }}>
+          <button className="btn btn-g" type="submit"
+                  title="Creates a new revision. The original stays in the archive.">
+            Reissue
+          </button>
+        </form>
+        <a className="btn btn-p" href="?print=1">Print</a>
       </div>
 
       <article className="wb" style={{ ['--wb' as string]: brand } as React.CSSProperties}>

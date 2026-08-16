@@ -909,6 +909,87 @@ a superseded import path left behind by 0024. All six are now wired or removed.
 
 It runs in CI, so this specific failure cannot ship again.
 
+## Sanity constraints (0028)
+
+Found by probing the database with deliberately wrong data, not by reading.
+Most constraints already held — stock cannot go negative, costs and reorder
+points cannot be negative, blank names and duplicate tags are refused. Three
+were not covered.
+
+**An asset could be acquired in 2027.** A future date makes the age profile
+nonsense and puts the asset outside every depreciation window. Tomorrow is
+still allowed, because entering a delivery arriving in the morning is
+reasonable; a year out is a typo.
+
+**A meter could go backwards, silently.** 5,000 hours to 100. This is the
+serious one: fuel reconciliation compares litres issued against hours run, so a
+dropping meter makes a genuine loss look like a surplus — the one check
+designed to catch theft stops working.
+
+It is not a refusal, because meters legitimately reset when an engine or
+dashboard is replaced. A drop is accepted *with a reason*, and logged as a
+`warn` event. That is the difference between an event and a mistake.
+
+**A transfer could go from a place to itself**, producing a waybill that reads
+as an error to whoever receives it.
+
+Every constraint is added `NOT VALID`, deliberately: a company that already
+imported one bad date should be able to deploy and then fix the row, not have
+the migration refuse to apply and leave them stuck. New writes are checked
+immediately.
+
+`data_health()` surfaces what needs tidying — future dates, missing serials,
+assets with no catalog model, locations never stock-counted — on the
+Diagnostics page, so somebody finds it there rather than when a constraint is
+validated months later.
+
+## Three more CI checks
+
+`tests-links.mjs` walks every internal `href` and fails on one pointing at a
+route that does not exist. The build compiles happily with a dead link;
+nothing else catches it.
+
+An empty-state audit found five pages that render a bare table with no rows and
+no explanation — which looks broken. The two that a real user hits are fixed: a
+new company's Locations page now explains the virtual warehouse and offers the
+branch import, and the import preview handles a paste it could not read.
+
+## What the new checks found (0028)
+
+Rather than guessing at what else was broken, I wrote checks for the failure
+modes I had already hit twice, and ran them.
+
+**Six forms were missing fields their actions read.** A form that omits a field
+its action reads submits happily and sends null — no error, nothing in the log,
+the value quietly lost. The worst was `decide_request`: rejecting a request
+silently discarded the reason, so the person whose request was refused was
+never told why. Also missing: the note on returning a machine to service, the
+comp end date, and — most consequentially — the asset and job reference when
+issuing stock.
+
+**That last one meant the fuel check could never run.** Naming the asset is
+what makes the comparison possible, and the form had no field for it.
+
+**The fuel check had no screen at all.** `fuel_reconciliation()` has worked
+since 0006, but it takes one asset id — so using it required already knowing
+which generator to suspect, which is the thing you do not know. Nothing called
+it. The marketing site sells "shrinkage you can find" and the product had
+nowhere to find it. `fuel_fleet()` and `/fuel` fix that: verified at 40 hours
+run, 1,800 litres issued against 740 the engine could burn — 1,060 litres
+flagged.
+
+**Waybills were never created.** The page reads `waybill_documents`, the
+snapshot function existed, and nothing wrote a row — so "Print the waybill"
+always said none had been issued. Dispatch now issues one, and a failure to
+prepare the document does not undo the dispatch: the assets have left the
+origin register, and that is the fact that matters.
+
+**The data export the privacy notice promises had no button.**
+
+`tests-forms.mjs` joins the CI suite. It found all six mismatches, and it is
+the sort of thing that reads as pedantic until you notice the rejection reason
+was being thrown away.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

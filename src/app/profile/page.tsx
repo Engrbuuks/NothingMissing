@@ -73,6 +73,25 @@ export default async function Profile({
         </form>
       </div>
 
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h bd">
+          <div>
+            <div className="card-t">Your data</div>
+            <div className="card-s">
+              Everything we hold about you, which the privacy notice says you can ask for
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          <a className="btn btn-g" href="/profile/export">Download my data</a>
+          <p className="hint" style={{ marginTop: 10, maxWidth: '60ch' }}>
+            Your profile, which companies you belong to and in what role, and what you have
+            agreed to. Actions you took stay in each company&rsquo;s audit log — that record
+            belongs to the company and is the basis of its asset register.
+          </p>
+        </div>
+      </div>
+
       <div className="card">
         <div className="card-h bd">
           <div><div className="card-t">What history keeps</div></div>

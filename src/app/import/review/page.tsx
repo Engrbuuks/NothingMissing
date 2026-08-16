@@ -43,7 +43,21 @@ export default async function Review({
     <Shell current="import" title="Check before importing" subtitle="Nothing has been written yet">
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
-      {p.rejected > 0 && (
+      {rows.length === 0 && (
+        <div className="card">
+          <div className="empty">
+            <h4>No rows could be read</h4>
+            <p>
+              The first line of what you pasted should be your column names, and there needs
+              to be at least one row under it. If you pasted from Excel, select the header
+              row as well as the data.
+            </p>
+            <a className="btn btn-p" href="/import" style={{ marginTop: 18 }}>Go back and paste again</a>
+          </div>
+        </div>
+      )}
+
+      {rows.length > 0 && p.rejected > 0 && (
         <div className="notice warn">
           <p>
             <b>{p.rejected} row{p.rejected === 1 ? '' : 's'} will be skipped.</b> The rest will
@@ -62,6 +76,7 @@ export default async function Review({
         </div>
       )}
 
+      {rows.length > 0 && (
       <div className="kpis" style={{ marginBottom: 18 }}>
         {[
           { v: String(p.assets ?? 0), l: 'Assets to create', c: '#0FA45E', s: '#E4F7ED' },
@@ -81,6 +96,9 @@ export default async function Review({
         ))}
       </div>
 
+      )}
+
+      {rows.length > 0 && (
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-h bd">
           <div>
@@ -129,7 +147,9 @@ export default async function Review({
         )}
       </div>
 
-      {errors.length > 0 && (
+      )}
+
+      {rows.length > 0 && errors.length > 0 && (
         <div className="card" style={{ marginBottom: 18 }}>
           <div className="card-h bd">
             <div>
@@ -154,6 +174,7 @@ export default async function Review({
         </div>
       )}
 
+      {rows.length > 0 && (
       <form action={commitBranchImport} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <input type="hidden" name="sheet" value={raw} />
         <input type="hidden" name="branch" value={branch} />
@@ -167,10 +188,13 @@ export default async function Review({
             : 'Nothing to import'}
         </button>
       </form>
+      )}
+      {rows.length > 0 && (
       <p className="hint" style={{ marginTop: 12 }}>
         The whole file imports as one action — if anything fails, nothing is written and you
         can try again. A half-imported register is worse than none.
       </p>
+      )}
     </Shell>
   );
 }

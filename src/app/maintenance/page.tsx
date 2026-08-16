@@ -83,7 +83,9 @@ export default async function Maintenance({
                 <option>Could not be repaired</option>
               </select>
               <input className="inp" name="cost" placeholder="Final cost" style={{ width: 130 }} />
-              <button className="btn btn-p" type="submit">Return to service</button>
+              <input className="inp" name="note" placeholder="What was done"
+                              style={{ flex: 1, minWidth: 150, padding: '6px 10px', fontSize: 12.5 }} />
+                       <button className="btn btn-p" type="submit">Return to service</button>
             </form>
           ))}
           <p className="hint" style={{ padding: '14px 20px' }}>

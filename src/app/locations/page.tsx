@@ -44,6 +44,19 @@ export default async function Locations({
             </div>
           </div>
         </div>
+        {live.filter((l: any) => l.kind !== 'virtual').length === 0 ? (
+          <div className="empty">
+            <h4>No sites yet</h4>
+            <p>
+              Every company starts with a virtual warehouse, which is where swept, retired
+              and unassigned assets live. Add the depots, branches and site offices you
+              actually operate — or import a branch and its location is created for you.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20, flexWrap: 'wrap' }}>
+              <a className="btn btn-p" href="/import">Import a branch</a>
+            </div>
+          </div>
+        ) : (
         <div className="tbl-wrap">
           <table>
             <thead>
@@ -97,6 +110,7 @@ export default async function Locations({
             </tbody>
           </table>
         </div>
+        )}
         {admin && (
           <form action={createLocation} style={{ padding: 20, borderTop: '1px solid var(--line-2)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <input className="inp" name="name" placeholder="New location name" required style={{ flex: 1, minWidth: 180 }} />

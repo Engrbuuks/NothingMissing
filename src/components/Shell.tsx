@@ -17,6 +17,7 @@ const NAV = [
   { id: 'submissions', label: 'Field inbox', href: '/submissions' },
   { g: 'Lifecycle' },
   { id: 'maintenance', label: 'Maintenance', href: '/maintenance' },
+  { id: 'fuel', label: 'Fuel check', href: '/fuel' },
   { id: 'purchase-orders', label: 'Purchase orders', href: '/purchase-orders' },
   { id: 'suppliers', label: 'Suppliers', href: '/suppliers' },
   { id: 'reports', label: 'Reports', href: '/reports' },

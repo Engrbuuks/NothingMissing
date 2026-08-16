@@ -144,6 +144,14 @@ export default async function Diagnostics() {
     },
   ];
 
+  // What is wrong with the data itself, as opposed to the plumbing. Somebody
+  // should find a future-dated acquisition here rather than when a constraint
+  // is validated months later.
+  const { data: co3 } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  const { data: health } = co3
+    ? await supabase.rpc('data_health', { p_company: (co3 as any).id })
+    : { data: [] as any[] };
+
   const { data: leak } = await supabase.from('companies').select('id, name, slug');
   const visibleCompanies = leak ?? [];
 
@@ -206,6 +214,40 @@ export default async function Diagnostics() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h bd">
+          <div>
+            <div className="card-t">Your data</div>
+            <div className="card-s">
+              Nothing here is broken — these are things worth tidying, in rough order of
+              how much they cost you later
+            </div>
+          </div>
+        </div>
+        {((health ?? []) as any[]).length === 0 ? (
+          <div className="empty">
+            <h4>Nothing to tidy</h4>
+            <p>Every asset has a serial, a model and a sensible date, and every stocked
+            location has been counted at least once.</p>
+          </div>
+        ) : (
+          <div className="tbl-wrap">
+            <table>
+              <thead><tr><th>What</th><th>How many</th><th>Why it matters</th></tr></thead>
+              <tbody>
+                {((health ?? []) as any[]).map((h) => (
+                  <tr key={h.issue}>
+                    <td><div className="aname">{h.issue}</div></td>
+                    <td className="mono"><b>{h.count}</b></td>
+                    <td style={{ color: 'var(--text-2)', fontSize: 13 }}>{h.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 18 }}>

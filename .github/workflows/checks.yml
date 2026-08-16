@@ -38,6 +38,16 @@ jobs:
       - name: every action is reachable from a page
         run: node tests-reachable.mjs
 
+      # A form missing a field its action reads submits happily and loses the
+      # value — no error, nothing in the log, just data quietly not saved.
+      - name: forms supply what their actions read
+        run: node tests-forms.mjs
+
+      # A link to a route that does not exist is a dead end a user hits, and
+      # nothing else catches it — the build compiles happily.
+      - name: internal links resolve
+        run: node tests-links.mjs
+
   database:
     name: schema, RLS and 271 assertions
     runs-on: ubuntu-latest

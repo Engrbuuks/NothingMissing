@@ -83,7 +83,9 @@ export default async function Requests({ searchParams }: { searchParams: { error
                       <td style={{ textAlign: 'right' }}>
                         {r.status === 'pending' && (
                           <form action={decideRequest} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <input type="hidden" name="id" value={r.id} />
+                            <input className="inp" name="note" placeholder="Why — the person sees this"
+                                 style={{ flex: 1, minWidth: 150, padding: '6px 10px', fontSize: 12.5 }} />
+                          <input type="hidden" name="id" value={r.id} />
                             <button className="btn btn-p" type="submit" name="decision" value="approve">Approve</button>
                             <button className="btn btn-g" type="submit" name="decision" value="reject">Reject</button>
                           </form>

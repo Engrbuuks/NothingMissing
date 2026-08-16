@@ -229,7 +229,10 @@ export default async function AdminCompanies({
                       <form action={setComped} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <input type="hidden" name="company" value={c.id} />
                         <input type="hidden" name="reason" value={c.comped_reason ?? 'Early customer'} />
-                        <button className="btn btn-g" type="submit" name="on" value={c.comped ? 'no' : 'yes'}>
+                        <input className="inp" name="until" type="date"
+                          title="Free until this date. Leave blank for indefinitely."
+                          style={{ width: 150, padding: '6px 10px', fontSize: 12.5 }} />
+                   <button className="btn btn-g" type="submit" name="on" value={c.comped ? 'no' : 'yes'}>
                           {c.comped ? 'End free access' : 'Give free access'}
                         </button>
                       </form>

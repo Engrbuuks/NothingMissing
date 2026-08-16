@@ -89,10 +89,40 @@ export async function approveTransfer(id: string): Promise<void> {
 }
 
 export async function dispatchTransfer(id: string): Promise<void> {
-  const { error } = await sb().rpc('dispatch_transfer', { p_transfer: id });
+  const supabase = sb();
+  const { error } = await supabase.rpc('dispatch_transfer', { p_transfer: id });
+
+  if (error) {
+    revalidatePath(`/transfers/${id}`);
+    redirect(`/transfers/${id}?error=` + encodeURIComponent(error.message));
+  }
+
+  // Freeze the document at the moment of dispatch. Without this the waybill
+  // page has nothing to render and "Print the waybill" always says none has
+  // been issued — the snapshot table existed but nothing ever wrote to it.
+  //
+  // A failure here must not undo the dispatch: the assets have left the origin
+  // register, which is the fact that matters. The document can be reissued.
+  const { error: docError } = await supabase.rpc('issue_waybill_document', {
+    p_transfer: id,
+  });
+
   revalidatePath(`/transfers/${id}`);
   revalidatePath('/assets');
-  if (error) redirect(`/transfers/${id}?error=` + encodeURIComponent(error.message));
+
+  redirect(docError
+    ? `/transfers/${id}?error=` + encodeURIComponent(
+        `Dispatched, but the waybill could not be prepared: ${docError.message}`)
+    : `/transfers/${id}?dispatched=1`);
+}
+
+/** Reissuing after a correction. Creates a new revision; the original stays. */
+export async function reissueWaybill(id: string): Promise<void> {
+  const { error } = await sb().rpc('issue_waybill_document', { p_transfer: id });
+  revalidatePath(`/transfers/${id}/waybill`);
+  redirect(error
+    ? `/transfers/${id}?error=${encodeURIComponent(error.message)}`
+    : `/transfers/${id}/waybill`);
 }
 
 export async function acceptTransfer(formData: FormData): Promise<void> {

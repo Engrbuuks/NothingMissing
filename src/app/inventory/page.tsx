@@ -55,6 +55,15 @@ export default async function Inventory({
   };
 
   const categories = [...new Set((allItems ?? []).map((i: any) => i.category).filter(Boolean))].sort();
+
+  // Metered assets only — issuing diesel against a chair helps nobody, and a
+  // list of every asset in the company makes the useful ones unfindable.
+  const { data: metered } = await supabase
+    .from('assets')
+    .select('id, tag, name')
+    .not('meter_unit', 'is', null)
+    .neq('status', 'retired')
+    .order('tag');
   const low = list.filter((i) => stateOf(i) !== 'ok').length;
   const out = list.filter((i) => stateOf(i) === 'out').length;
   const value = list.reduce((s, i) => s + at(i.id) * Number(i.unit_cost_minor ?? 0), 0);
@@ -250,7 +259,20 @@ export default async function Inventory({
                 <input className="inp" name="qty" type="number" step="any" min="0" placeholder="Quantity" required />
                 <input className="inp" name="meter" type="number" step="any" placeholder="Meter reading" />
               </div>
-              <input className="inp" name="reason" placeholder="What it was for" />
+              {/* Naming the asset is what makes the fuel check possible: litres
+                  issued against what that engine could have burned between two
+                  meter readings. Without it the reconciliation has nothing to
+                  compare and the feature silently never runs. */}
+              <select className="inp" name="asset" defaultValue="">
+                <option value="">Not for a specific asset</option>
+                {(metered ?? []).map((a: any) => (
+                  <option key={a.id} value={a.id}>{a.tag} — {a.name}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input className="inp" name="job" placeholder="Job reference" />
+                <input className="inp" name="reason" placeholder="What it was for" />
+              </div>
               <button className="btn btn-p" type="submit">Record the issue</button>
             </form>
           </div>
