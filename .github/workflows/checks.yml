@@ -43,10 +43,30 @@ jobs:
       - name: forms supply what their actions read
         run: node tests-forms.mjs
 
+      # A redirect carrying a message to a page that never reads it means the
+      # user acts, something happens, and the screen says nothing.
+      - name: redirect messages are displayed
+        run: node tests-messages.mjs
+
+      # A button pointing at a route that does not exist looks like a broken
+      # feature rather than a missing one.
+      - name: internal links resolve
+        run: node tests-links.mjs
+
+      # Authentication is the one path where a mistake locks everyone out.
+      # The callback route was missing entirely and nothing caught it.
+      - name: authentication is wired end to end
+        run: node tests-auth.mjs
+
       # A link to a route that does not exist is a dead end a user hits, and
       # nothing else catches it — the build compiles happily.
       - name: internal links resolve
         run: node tests-links.mjs
+
+      # Authentication is the one path where a mistake locks everyone out.
+      # The callback route was missing entirely and nothing caught it.
+      - name: authentication is wired end to end
+        run: node tests-auth.mjs
 
   database:
     name: schema, RLS and 271 assertions

@@ -70,9 +70,15 @@ export default function SignIn() {
 
           <div style={{ height: 16 }} />
 
-          <label className="lbl" htmlFor="password">
-            Password
-          </label>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <label className="lbl" htmlFor="password">
+              Password
+            </label>
+            <a href="/auth/reset"
+               style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--brand)' }}>
+              Forgotten it?
+            </a>
+          </div>
           <input
             id="password"
             className="inp"

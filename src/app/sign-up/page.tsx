@@ -26,7 +26,9 @@ export default function SignUp() {
       email, password,
       options: {
         data: { full_name: name },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
+        // Must go through the callback: Supabase sends a code that has to be
+        // exchanged for a session before any page requiring one will work.
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 

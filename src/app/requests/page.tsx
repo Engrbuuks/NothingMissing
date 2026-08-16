@@ -9,7 +9,7 @@ const STATE: Record<string, string> = {
   rejected: 'p-bad', cancelled: 'p-mute', fulfilled: 'p-ok',
 };
 
-export default async function Requests({ searchParams }: { searchParams: { error?: string } }) {
+export default async function Requests({ searchParams }: { searchParams: { error?: string; raised?: string; decided?: string } }) {
   const supabase = sb();
 
   const { data, error } = await supabase
@@ -26,6 +26,15 @@ export default async function Requests({ searchParams }: { searchParams: { error
   return (
     <Shell current="requests" title="Requests" subtitle="Transfer, repair and purchase approvals">
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+      {searchParams.raised && (
+        <div className="notice">
+          <p>
+            <b>Raised.</b> It is now with whoever your approval rules name — you will see it
+            move through the chain below.
+          </p>
+        </div>
+      )}
+      {searchParams.decided && <div className="notice"><p>Recorded, with your name against it.</p></div>}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
       <div className="notice">

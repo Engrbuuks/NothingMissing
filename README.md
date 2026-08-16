@@ -990,6 +990,75 @@ origin register, and that is the fact that matters.
 the sort of thing that reads as pedantic until you notice the rejection reason
 was being thrown away.
 
+## Three more silent failures (0029)
+
+**Notification delivery status never saved.** `notify.ts` marks a message sent
+after the provider answers, and `app.notifications` had no UPDATE policy — so
+the write silently affected zero rows. Every notification stayed `queued`
+forever: the page would show a growing pile of apparently undelivered messages
+that had in fact been delivered, and any retry built on that status would
+resend them. A write with no matching policy does not error, which is the worst
+kind of failure.
+
+Delivery fields can now be updated and nothing else — a notification is a
+record of what was sent, and if the body could be edited afterwards it would
+stop being evidence of anything. Attachments got the same treatment: the
+caption is correctable, the file it points at is not.
+
+**Three redirect messages were swallowed.** An action redirected with
+`?error=…` to a page that never read the parameter. On `/transfers` that meant
+a failed dispatch showed nothing at all — the user clicks, something goes
+wrong, and the screen is unchanged.
+
+**A bare `insert` into companies had no policy.** Nothing was visibly broken
+because sign-up runs as SECURITY DEFINER, but a policy nobody decided on is a
+trap for the next person. It is now explicitly `with check (false)`, with a
+comment saying why: companies are created by `signup_company()`, which sets up
+the owner and virtual warehouse in the same transaction. A bare insert would
+leave a company nobody belongs to.
+
+### The checks themselves needed fixing
+
+Three of the four new checks reported working code as broken on their first
+run, which is worse than not checking at all — a check that cries wolf gets
+ignored, and then it is there for the one time it is right.
+
+- The write-policy check grepped the migrations and missed policies generated
+  in a loop. It queries `pg_policies` now.
+- The RPC-argument check could not parse `DEFAULT NULL::uuid`, because the
+  comma inside the default broke the argument split. It reads `pg_proc` now.
+- The link checker split each href on `?` before collapsing `${…}`, which
+  truncated `/catalog/${a.models?.id}` at the optional chaining.
+
+Both database checks run inside `backend/scripts/test.sh`, alongside the RLS
+guard, rather than as separate text-matching scripts.
+
+## Authentication was broken (no migration)
+
+**The auth callback route did not exist.** Supabase sends a one-time code that
+must be exchanged for a session, and sign-up pointed its confirmation email
+straight at `/onboarding` — a page that requires a session. So every new
+sign-up clicked the link, landed somewhere that immediately bounced them to
+sign-in, and had no route through. Nothing in the logs would have explained it.
+
+**There was no password reset at all.** Anyone who forgot their password was
+locked out permanently, with no way back except editing the database.
+
+Both are built. `/auth/callback` handles confirmation, recovery and invitation
+links; recovery goes to `/auth/update-password` regardless of `next`, because
+otherwise somebody arrives signed in having never chosen a password and the
+reset silently does nothing. The reset page shows the same screen whether or
+not an address is registered — saying "no such account" turns it into a way to
+find out who your customers are.
+
+`tests-auth.mjs` covers seventeen properties of the auth wiring and joins CI.
+Authentication is the one path where a mistake locks everyone out, and it had
+no check at all.
+
+**`docs/AUTH-SETUP.md`** covers the three Supabase dashboard settings the code
+depends on. The redirect URL allow-list is the one that bites: without the
+entry, confirmation emails fail with no clue why.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

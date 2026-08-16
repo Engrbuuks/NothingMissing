@@ -26,7 +26,7 @@ export default async function AssetDetail({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { error?: string; handed?: string };
+  searchParams: { error?: string; handed?: string; added?: string; saved?: string };
 }) {
   const session = await getSession();
   const supabase = sb();
@@ -115,6 +115,12 @@ export default async function AssetDetail({
           </a>
         )}
       </div>
+      {searchParams.added && (
+        <div className="notice"><p>Added to the register.</p></div>
+      )}
+      {searchParams.saved && (
+        <div className="notice"><p>Saved. The audit log records exactly what changed.</p></div>
+      )}
       {searchParams.error && (
         <div className="notice bad">
           <p>{searchParams.error}</p>

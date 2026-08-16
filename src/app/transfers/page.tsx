@@ -30,7 +30,7 @@ const days = (iso: string | null) =>
 
 export default async function Transfers({
   searchParams,
-}: { searchParams: { q?: string; status?: string } }) {
+}: { searchParams: { q?: string; status?: string; error?: string; deleted?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const q = (searchParams.q ?? '').trim();
@@ -64,6 +64,9 @@ export default async function Transfers({
       title="Transfers"
       subtitle="Assets moving between registers"
     >
+      {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+      {searchParams.deleted && <div className="notice"><p>Draft removed.</p></div>}
+
       <form className="toolbar" method="get" action="/transfers">
         <div className="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

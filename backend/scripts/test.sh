@@ -26,6 +26,17 @@ if ! out=$(PGOPTIONS="-c client_min_messages=notice" $PSQL -d "$DB" -f "$HERE/sc
 fi
 echo "$out" | grep -oE 'PASS  .*' | sed 's/^PASS  /  ✓ /'
 
+# Two checks that must query the database rather than grep the migrations:
+# policies are often generated in a loop, and function arguments carry defaults
+# containing commas. Text-based versions of both reported working code as
+# broken, which is worse than not checking.
+for guard in verify_write_policies verify_rpc_args; do
+  if ! out=$(PGOPTIONS="-c client_min_messages=notice" $PSQL -d "$DB" -f "$HERE/scripts/$guard.sql" 2>&1); then
+    echo "$out" | sed 's/^/    /'; exit 1
+  fi
+  echo "$out" | grep -oE '✓.*' | sed 's/^/  /'
+done
+
 echo "▸ helpers and seed"
 PGOPTIONS="-c client_min_messages=warning" $PSQL -d "$DB" -f "$HERE/supabase/tests/_helpers.sql" >/dev/null
 PGOPTIONS="-c client_min_messages=warning" $PSQL -d "$DB" -f "$HERE/supabase/seed.sql" >/dev/null

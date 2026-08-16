@@ -22,9 +22,14 @@ const routes = new Set(pages.map(p =>
 const src = pages.map(p => ({p, s: readFileSync(p,'utf8')}));
 const hrefs = new Map();
 for (const {p,s} of src) {
-  for (const m of s.matchAll(/href=(?:"|\{`)(\/[a-zA-Z0-9\-_/\[\]${}.]*)/g)) {
-    let h = m[1].split('?')[0].replace(/\/$/,'') || '/';
-    if (h.includes('${')) h = h.replace(/\$\{[^}]+\}/g, '[id]');
+  // Template literals must be matched to their closing backtick, or an
+  // interpolation is truncated mid-expression and reported as a broken link.
+  for (const m of s.matchAll(/href=(?:"(\/[^"]*)"|\{`(\/[^`]*)`\})/g)) {
+    // Collapse interpolations FIRST. Splitting on '?' to drop the query string
+    // before doing so truncates `${a.models?.id}` at the optional chaining and
+    // reports a working link as broken.
+    let h = (m[1] ?? m[2]).replace(/\$\{.*?\}/g, '[id]');
+    h = h.split('?')[0].replace(/\/$/,'') || '/';
     hrefs.set(h, (hrefs.get(h) ?? new Set()).add(p));
   }
 }
@@ -32,6 +37,9 @@ for (const {p,s} of src) {
 const norm = r => r.replace(/\[[^\]]+\]/g, '[id]');
 const known = new Set([...routes].map(norm));
 known.add('/'); known.add('/auth/sign-out');
+// /l/<token> is rewritten to /field/<token> by the middleware, so it is a real
+// destination even though no file serves it.
+known.add('/l/[id]');
 
 const broken = [];
 for (const [h, from] of hrefs) {

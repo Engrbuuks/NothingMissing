@@ -42,7 +42,7 @@ insert into app.reserved_slugs (slug, reason) values
   -- product routes on the apex
   ('sign-in','product route'), ('signin','product route'), ('login','product route'),
   ('signup','product route'), ('register','product route'), ('logout','product route'),
-  ('reset','product route'), ('invite','product route'), ('join','product route'), ('sign-up','product route'), ('onboarding','product route'),
+  ('auth','product route'), ('reset','product route'), ('invite','product route'), ('join','product route'), ('sign-up','product route'), ('onboarding','product route'),
   ('home','marketing'), ('pricing','marketing'), ('about','marketing'), ('blog','marketing'),
   ('docs','marketing'), ('help','marketing'), ('legal','marketing'),
   ('privacy','marketing'), ('terms','marketing'), ('contact','marketing'),
