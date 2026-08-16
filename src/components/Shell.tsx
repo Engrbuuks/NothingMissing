@@ -128,7 +128,7 @@ export default async function Shell({
             )}
           </nav>
           <div className="side-foot">
-            <div className="side-user">
+            <a className="side-user" href="/profile">
               <span className="av">{initials(session.fullName ?? session.email)}</span>
               <span>
                 <span className="side-user-n">{session.fullName ?? session.email}</span>
@@ -137,7 +137,7 @@ export default async function Shell({
                   {session.role} · {scope}
                 </span>
               </span>
-            </div>
+            </a>
           </div>
         </aside>
 

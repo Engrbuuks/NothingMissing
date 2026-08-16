@@ -1160,3 +1160,35 @@ export async function updateAsset(formData: FormData): Promise<void> {
   revalidatePath('/assets');
   redirect(error ? `/assets/${id}/edit?error=${encodeURIComponent(error.message)}` : `/assets/${id}?saved=1`);
 }
+
+export async function updateMyProfile(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('update_my_profile', {
+    p_full_name: String(formData.get('full_name') ?? ''),
+    p_phone: String(formData.get('phone') ?? '') || null,
+    p_job_title: String(formData.get('job_title') ?? '') || null,
+  });
+  revalidatePath('/profile');
+  revalidatePath('/', 'layout');
+  redirect(error ? `/profile?error=${encodeURIComponent(error.message)}` : '/profile?saved=1');
+}
+
+export async function renameCompany(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
+  const { error } = await supabase.rpc('rename_company', {
+    p_company: co.id,
+    p_name: String(formData.get('name') ?? ''),
+  });
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
+}
+
+export async function resendInvitation(id: string): Promise<void> {
+  const { data, error } = await sb().rpc('resend_invitation', { p_id: id });
+  revalidatePath('/people');
+  redirect(error
+    ? `/people?error=${encodeURIComponent(error.message)}`
+    : `/people?invite=${encodeURIComponent((data as any)?.path ?? '')}`);
+}

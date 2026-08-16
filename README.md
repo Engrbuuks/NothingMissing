@@ -862,6 +862,37 @@ demote themselves.
 People page renders it. The description and the behaviour cannot drift apart
 because they are the same source.
 
+## Letting people in (0027)
+
+Two gaps, found by using the system as a new company rather than as its author.
+
+**Invitations existed but nothing reached them.** 0014 built `invite_member()`,
+`accept_invitation()` and the `/join` page, and all of it worked — but the
+People page never called any of it. The only way to add a second person was to
+write SQL, which means in practice nobody but the founder ever signed in. A
+feature nothing reaches is a feature that does not exist.
+
+Verified end to end: invite issued, previewed by the recipient before signing
+in, accepted, membership created with the right role and location, and the new
+person immediately adds an asset.
+
+**A name could not be changed.** It came from `auth.users` metadata, written at
+sign-up and editable nowhere. Somebody who signed up as "Test" was stuck with
+it on every audit row and waybill. There is now a profile page, reachable by
+clicking your own name in the sidebar.
+
+Renaming does **not** rewrite audit rows already written — they keep the name
+held at the time. If a rename could rewrite the log, renaming would be a way to
+quietly edit history.
+
+**Renaming the company** is free; the slug is not. Every field link already
+shared and every waybill already printed carries the slug, so it stays fixed
+while the display name changes.
+
+`docs/ADDING-PEOPLE.md` covers the whole thing, including why a company should
+promote a second owner early: only an owner can make another owner, so a single
+owner leaving makes the company unadministrable.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

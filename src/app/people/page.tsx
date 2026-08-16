@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
-import { issueLink, revokeLink, setMemberRole } from '@/lib/actions';
+import { issueLink, revokeLink, setMemberRole, inviteMember,
+         revokeInvitation, resendInvitation } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ const VERBS: [string, string][] = [
 
 export default async function People({
   searchParams,
-}: { searchParams: { token?: string; slug?: string; error?: string; role?: string } }) {
+}: { searchParams: { token?: string; slug?: string; error?: string; role?: string; invite?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const isAdmin = hasRole(session, 'owner', 'admin');
@@ -39,6 +40,14 @@ export default async function People({
   // What each role can do, read from the database rather than written here, so
   // the description and the behaviour cannot drift apart.
   const { data: caps } = await supabase.rpc('role_capabilities');
+
+  // Invitations existed since 0014 but nothing on this page called them, so in
+  // practice nobody but the founder ever signed in. A feature nothing reaches
+  // is a feature that does not exist.
+  const { data: co2 } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  const { data: invites } = co2
+    ? await supabase.rpc('company_invitations', { p_company: (co2 as any).id })
+    : { data: [] as any[] };
   const owners = ((members ?? []) as any[]).filter((m) => m.role === 'owner').length;
 
   const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';

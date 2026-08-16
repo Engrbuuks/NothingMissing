@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole, logoUrl } from '@/lib/session';
-import { updateCompany, closeCompany, saveTheme, saveLogo, saveViewPreferences } from '@/lib/actions';
+import { updateCompany, closeCompany, saveTheme, saveLogo, saveViewPreferences,
+         renameCompany } from '@/lib/actions';
 import LogoUpload from './LogoUpload';
 
 export const dynamic = 'force-dynamic';
