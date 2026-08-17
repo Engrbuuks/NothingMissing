@@ -35,7 +35,9 @@ export default function SignIn() {
 
     // A full reload rather than a client transition: the session cookie was
     // just written, and the server needs to see it on the next request.
-    window.location.href = '/';
+    // Not '/'. On the apex that has no tenant and redirects to the marketing
+    // site, so a signed-in owner ended up being invited to start free.
+    window.location.href = '/auth/landing';
   }
 
   return (

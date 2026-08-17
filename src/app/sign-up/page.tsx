@@ -7,6 +7,12 @@ import { browser } from '@/lib/supabase';
 
 export default function SignUp() {
   const supabase = browser();
+  // Somebody arriving from an invitation is not founding a company, and the
+  // page said nothing about that — so they reasonably assumed sign-up meant
+  // registering a new business.
+  const joining =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('joining') === '1';
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -73,8 +79,9 @@ export default function SignUp() {
             back here to name your company.
           </p>
           <p style={{ color: 'var(--text-3)', fontSize: 12.5, marginTop: 16, lineHeight: 1.6 }}>
-            A company cannot be created until the address is confirmed — otherwise anyone
-            could claim an address using an inbox they do not control.
+            {joining
+              ? 'Confirm the address and you will be brought back to accept your invitation.'
+              : 'A company cannot be created until the address is confirmed — otherwise anyone could claim an address using an inbox they do not control.'}
           </p>
           <p style={{ color: 'var(--text-3)', fontSize: 12.5, marginTop: 12, lineHeight: 1.6 }}>
             If this address already has an account, no new email is sent —{' '}
@@ -91,9 +98,11 @@ export default function SignUp() {
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <Wordmark size={24} tagline />
-        <h1 style={{ fontSize: 25 }}>Create an account</h1>
-        <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 7 }}>
-          Free while you set it up. No card.
+        <h1 style={{ fontSize: 25 }}>{joining ? 'Create your account' : 'Create an account'}</h1>
+        <p style={{ color: 'var(--text-3)', fontSize: 13.5, marginTop: 7, lineHeight: 1.6 }}>
+          {joining
+            ? 'Use the address your invitation was sent to. You will be taken straight back to join, not asked to start a company.'
+            : 'Free while you set it up. No card.'}
         </p>
 
         <form onSubmit={submit} style={{ marginTop: 22 }}>

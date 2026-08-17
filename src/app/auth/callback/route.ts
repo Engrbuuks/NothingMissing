@@ -62,18 +62,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/auth/update-password', url.origin));
   }
 
-  // Somebody who already belongs to a company should go there, not to
-  // onboarding, which would invite them to create a second one.
-  const { data: membership } = await supabase
-    .from('memberships')
-    .select('companies ( slug )')
-    .limit(1)
-    .maybeSingle();
-
-  const slug = (membership as any)?.companies?.slug;
-  if (slug && next === '/onboarding') {
-    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
-    return NextResponse.redirect(`https://${slug}.${root}/`);
+  // One place decides where somebody belongs: an invitation outranks a
+  // company, a company outranks onboarding. Working it out here as well as on
+  // sign-in is how the two answers drift apart.
+  if (next === '/onboarding') {
+    return NextResponse.redirect(new URL('/auth/landing', url.origin));
   }
 
   return NextResponse.redirect(new URL(next, url.origin));

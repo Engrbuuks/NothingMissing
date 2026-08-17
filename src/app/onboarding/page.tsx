@@ -21,6 +21,11 @@ export default async function Onboarding({
 
   const owned = (existing ?? [])[0] as any;
 
+  // Somebody invited to an existing company should not be quietly allowed to
+  // found a second one with the same name and wonder why it is empty.
+  const { data: pending } = await sb().rpc('my_pending_invitation');
+  const invite = (pending ?? {}) as any;
+
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
@@ -39,6 +44,17 @@ export default async function Onboarding({
                 Go there
               </a>{' '}
               — or fill this in to start a second one.
+            </p>
+          </div>
+        )}
+
+        {invite.found && (
+          <div className="notice warn" style={{ marginTop: 18 }}>
+            <p>
+              <b>You have an invitation to join {invite.company} as {invite.role}.</b> If that
+              is what you meant to do,{' '}
+              <a href="/auth/landing" style={{ textDecoration: 'underline' }}>accept it here</a>{' '}
+              — filling in this form instead creates a separate, empty company of your own.
             </p>
           </div>
         )}

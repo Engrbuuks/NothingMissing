@@ -1059,6 +1059,41 @@ no check at all.
 depends on. The redirect URL allow-list is the one that bites: without the
 entry, confirmation emails fail with no clue why.
 
+## Where people land (0030)
+
+Three bugs, all the same shape: the application knew how to authenticate
+somebody but not where to put them afterwards, and three screens each worked it
+out separately.
+
+**Signing in on the apex landed on the marketing site.** Sign-in sent people to
+`/`, which on nothingmissing.ng has no tenant and redirects to `/home`. A
+signed-in owner was looking at a page inviting them to start free.
+
+**An invited person was offered a new company.** The join page said "create an
+account", sign-up confirmed the address, and the callback sent them to
+`/onboarding` — which asks them to name a company. Somebody invited to join
+Zenith would have founded a second, empty Zenith and wondered why the register
+was blank.
+
+**Nothing could tell an invitation was waiting**, so no screen could route
+around it.
+
+`where_do_i_go()` is now the single answer, used by sign-in, the auth callback
+and the apex root alike. An invitation outranks a company; a company outranks
+onboarding; more than one company means choosing, because guessing sends
+somebody to a register they were not thinking about.
+
+`accept_my_invitation()` works by address rather than token, so somebody who
+confirmed their email and came back without the original link is not stranded.
+The invitation was bound to that address, so this grants nothing the token
+would not have.
+
+Onboarding now warns anybody with a pending invitation before they can found a
+company by mistake.
+
+The message check caught one of my own new bugs while I was writing this: an
+error from `acceptMyInvitation` redirected to a page that never displayed it.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

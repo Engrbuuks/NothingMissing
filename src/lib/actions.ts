@@ -1166,3 +1166,17 @@ export async function resendInvitation(id: string): Promise<void> {
     ? `/people?error=${encodeURIComponent(error.message)}`
     : `/people?invite=${encodeURIComponent((data as any)?.path ?? '')}`);
 }
+
+/**
+ * Accepting an invitation without the original link.
+ *
+ * Somebody who was invited, confirmed their email, and came back no longer has
+ * the token to hand. The invitation was bound to their address, so accepting
+ * by address grants nothing the token would not have — and it stops a
+ * confirmed invitee being stranded on a page offering to found a company.
+ */
+export async function acceptMyInvitation(): Promise<void> {
+  const { data, error } = await sb().rpc('accept_my_invitation');
+  if (error) redirect('/auth/landing?error=' + encodeURIComponent(error.message));
+  redirect((data as any)?.url ?? '/auth/landing');
+}
