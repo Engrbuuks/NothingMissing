@@ -21,7 +21,10 @@ export default function Reset() {
     setBusy(true);
 
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      // No query string, for the same reason as sign-up: Supabase validates
+      // this against an allow-list. It appends type=recovery itself, which is
+      // what the callback reads.
+      redirectTo: `${window.location.origin}/auth/callback`,
     });
 
     // Deliberately the same screen whether or not the address is registered.

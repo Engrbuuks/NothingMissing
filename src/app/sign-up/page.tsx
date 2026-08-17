@@ -28,14 +28,38 @@ export default function SignUp() {
         data: { full_name: name },
         // Must go through the callback: Supabase sends a code that has to be
         // exchanged for a session before any page requiring one will work.
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        //
+        // No query string. Supabase validates this against an allow-list, and
+        // a URL carrying `?next=…` has to match an entry that accounts for the
+        // query — one more thing to get wrong in a dashboard nobody looks at.
+        // The callback already defaults to /onboarding, so the parameter was
+        // buying nothing.
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
-    if (error) { setError(error.message); setBusy(false); return; }
-    // Deliberately the same screen whether or not the address was already
-    // registered: otherwise this page tells anyone who asks which of their
-    // guesses has an account here.
+    if (error) {
+      // Only genuine input problems are shown. Anything else — including a
+      // server error, which Supabase returns when the address already has a
+      // confirmed account — falls through to the same confirmation screen a
+      // new address gets.
+      //
+      // That is deliberate twice over: it keeps the promise this page makes
+      // about not revealing who has an account, and it stops a Supabase-side
+      // failure reaching somebody as a raw error they cannot act on. A person
+      // who already has an account will find the sign-in link on the next
+      // screen, which is where they needed to go anyway.
+      const inputProblem =
+        /password|email address|invalid|weak|characters/i.test(error.message) &&
+        !/already|registered|exists/i.test(error.message);
+
+      if (inputProblem) {
+        setError(error.message);
+        setBusy(false);
+        return;
+      }
+    }
+
     setSent(true); setBusy(false);
   }
 
@@ -52,7 +76,12 @@ export default function SignUp() {
             A company cannot be created until the address is confirmed — otherwise anyone
             could claim an address using an inbox they do not control.
           </p>
-          <a className="btn btn-g" href="/sign-in" style={{ marginTop: 22 }}>Back to sign in</a>
+          <p style={{ color: 'var(--text-3)', fontSize: 12.5, marginTop: 12, lineHeight: 1.6 }}>
+            If this address already has an account, no new email is sent —{' '}
+            <a href="/sign-in" style={{ textDecoration: 'underline' }}>sign in</a> instead, or{' '}
+            <a href="/auth/reset" style={{ textDecoration: 'underline' }}>set a new password</a>.
+          </p>
+          <a className="btn btn-p" href="/sign-in" style={{ marginTop: 22 }}>Go to sign in</a>
         </div>
       </main>
     );

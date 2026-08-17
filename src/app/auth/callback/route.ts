@@ -22,6 +22,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next') ?? '/onboarding';
+  // Supabase appends this itself on a recovery link. We never set it, because
+  // a redirect_to carrying a query string has to match an allow-list entry
+  // that accounts for the query — a needless way to fail.
   const type = url.searchParams.get('type');
 
   // Supabase reports its own failures here — an expired link, mostly. Say so
