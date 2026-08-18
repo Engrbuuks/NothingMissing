@@ -1462,3 +1462,30 @@ export async function deleteApprovalPolicy(id: string): Promise<void> {
   revalidatePath('/approvals');
   redirect(error ? `/approvals?error=${encodeURIComponent(error.message)}` : '/approvals?removed=1');
 }
+
+/**
+ * Logging maintenance on any asset.
+ *
+ * The maintenance page could only act on assets the system had already flagged
+ * as due by interval — so a generator that broke unexpectedly had nowhere to
+ * be recorded. Machines do not break on schedule, which is most of the point of
+ * tracking them.
+ */
+export async function logMaintenance(formData: FormData): Promise<void> {
+  const asset = String(formData.get('asset') ?? '');
+  const cost = String(formData.get('cost') ?? '').replace(/[^\d]/g, '');
+
+  const { error } = await sb().rpc('log_service', {
+    p_asset: asset,
+    p_kind: String(formData.get('kind') ?? 'repair'),
+    p_cost: cost ? Number(cost) * 100 : null,
+    p_vendor: String(formData.get('vendor') ?? '') || null,
+    p_note: String(formData.get('note') ?? '') || null,
+  });
+
+  revalidatePath('/maintenance');
+  revalidatePath(`/assets/${asset}`);
+  redirect(error
+    ? `/maintenance/new?error=${encodeURIComponent(error.message)}`
+    : '/maintenance?logged=1');
+}

@@ -110,9 +110,15 @@ export default async function AssetDetail({
       <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
         <a className="btn btn-g" href="/assets">Back to the register</a>
         {canWrite(session) && (
-          <a className="btn btn-p" href={`/assets/${a.id}/edit`} style={{ marginLeft: 'auto' }}>
-            Edit
-          </a>
+          <>
+            {/* Somebody looking at a machine that has just broken should not
+                have to go and find the maintenance page and search for it. */}
+            <a className="btn btn-g" href={`/maintenance/new?asset=${a.id}`}
+               style={{ marginLeft: 'auto' }}>
+              Log maintenance
+            </a>
+            <a className="btn btn-p" href={`/assets/${a.id}/edit`}>Edit</a>
+          </>
         )}
       </div>
       {searchParams.added && (

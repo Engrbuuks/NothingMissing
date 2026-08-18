@@ -1175,6 +1175,44 @@ The reachability checks caught three gaps in what I had just written — a cance
 action with no form, a form missing a field its action read, and a confirmation
 message no page displayed.
 
+## Filing maintenance (0032)
+
+The maintenance page only offered actions on machines the system had already
+flagged as due by their service interval. A generator that broke on a Tuesday
+had **nowhere to be recorded** — and machines do not break on schedule, which
+is most of the point of tracking them.
+
+`/maintenance/new` logs a repair, service, inspection or calibration against
+any asset, and the asset page links to it directly, because somebody looking at
+a machine that has just failed should not have to go and search for it.
+
+**Logging a repair now takes the asset out of service.** `log_service()`
+recorded the work and left the status alone, so a machine on a workbench still
+read "In service" on every register and report — and `return_to_service()` had
+nothing to return it from. The two were written as a pair and only one half did
+its job. An inspection deliberately does not change the status: checking a
+machine and finding it sound should not stop anybody using it.
+
+A note under three characters is refused. Somebody will read it in a year
+without having been there, and "fixed" tells them nothing.
+
+Two things the existing test suite caught while I was fixing this, both of
+which I would have shipped:
+
+- I made `return_to_service()` always set the asset active. A **failed** repair
+  must leave it out of service, or a dead machine returns to the register and a
+  write-off skips the disposal chain — the one action that always needs two
+  signatures. My first fix matched failure against a literal list of words; the
+  test used "Could not be repaired", so it now matches on intent.
+- I only recorded a maintenance event when there was a cost. A history showing
+  the going-out but not the coming-back reads as though the machine never
+  returned.
+
+### Purchase orders
+
+`/purchase-orders/new` was built in 0031. If it is not working, **migration
+0031 has not been run** — `raise_purchase_order()` will not exist until it is.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

@@ -1,5 +1,5 @@
 import Shell from '@/components/Shell';
-import { sb, money, canSeeFinancials, getSession } from '@/lib/session';
+import { sb, money, canSeeFinancials, canWrite, getSession } from '@/lib/session';
 import { logService, returnToService } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function Maintenance({
   searchParams,
-}: { searchParams: { error?: string; returned?: string } }) {
+}: { searchParams: { error?: string; returned?: string; logged?: string } }) {
   const session = await getSession();
   const supabase = sb();
 
@@ -41,7 +41,17 @@ export default async function Maintenance({
 
   return (
     <Shell current="maintenance" title="Maintenance" subtitle="What is due for service, and when">
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        {canWrite(session) && (
+          <a className="btn btn-p" href="/maintenance/new">Log maintenance</a>
+        )}
+        <a className="btn btn-g" href="/assets?status=repair">Assets in repair</a>
+      </div>
+
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+      {searchParams.logged && (
+        <div className="notice"><p>Recorded on the asset&rsquo;s history.</p></div>
+      )}
       {searchParams.returned && <div className="notice"><p>Back in service, and the repair is on the asset&rsquo;s history.</p></div>}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
