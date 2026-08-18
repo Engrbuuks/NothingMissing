@@ -1132,6 +1132,49 @@ calling it. The reachability checks now cover server actions, database
 functions, forms, redirect messages and notification events — each one added
 after the same mistake.
 
+## Purchase orders and the approval hierarchy (0031)
+
+Two things were modelled but had no way in, and both were fair criticism.
+
+**Purchase orders could not be created.** The table, the lines, the statuses
+and `receive_goods()` all existed since 0009 — with no function to raise one
+and no page to do it from. The screen listed orders that could never come into
+being.
+
+`/purchase-orders/new` now raises a draft, and issuing it is a separate,
+deliberate step: a draft is somebody thinking, an issued order is a commitment
+to a supplier. Cancelling requires a reason, because "cancelled" on its own
+answers nothing when somebody asks in six months.
+
+The line kinds matter and the schema was right to insist on them. An **asset**
+line must name a catalog model, because receiving it creates a tagged unit that
+inherits a specification. A **stock** line must name an item, because receiving
+it moves a balance. Anything else is a **service** — labour, transport, a
+callout. My first version defaulted everything to 'asset', which would have
+created assets with no model: exactly what the catalog exists to prevent.
+
+**The approval hierarchy could only be set in SQL.** `approval_policies` is
+what decides that a ₦2m purchase needs two signatures and a ₦40k one needs
+one — and there was no screen for it, so every company ran on whatever the seed
+contained or on nothing at all. I flagged this as a gap early and did not build
+it, which made the approval chain a feature in the documentation rather than in
+the product.
+
+`/approvals` now shows the rules per request type and lets an owner or admin
+add and remove them. Companies get a sensible default hierarchy on creation —
+one signature for small purchases, two above ₦500,000, two for any disposal —
+because a company with no rules has no hierarchy and nobody notices until a
+request sits unapproved.
+
+Three guards are worth naming: an empty chain is refused rather than silently
+letting everything through; four signatures is the ceiling, because beyond that
+people stop reading and start clicking; and the last rule for a request type
+cannot be deleted without a replacement.
+
+The reachability checks caught three gaps in what I had just written — a cancel
+action with no form, a form missing a field its action read, and a confirmation
+message no page displayed.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

@@ -156,6 +156,12 @@ insert into app.assets
 on conflict do nothing;
 
 -- ------------------------------------------------------ approval policies --
+-- Companies now get a default hierarchy on creation (0031), which is right for
+-- a real company and wrong for a fixture: the test needs to assert against
+-- exactly the rules it defines, not against those plus the defaults. So the
+-- fixture clears them first and sets its own.
+delete from app.approval_policies;
+
 insert into app.approval_policies
   (company_id, request_type, name, priority, min_items, max_items, chain) values
   ('aaaaaaaa-0000-0000-0000-000000000001','transfer','Transfers under 5 assets',

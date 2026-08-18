@@ -1368,3 +1368,97 @@ export async function acceptMyInvitation(): Promise<void> {
   if (error) redirect('/auth/landing?error=' + encodeURIComponent(error.message));
   redirect((data as any)?.url ?? '/auth/landing');
 }
+
+/**
+ * Raising a purchase order.
+ *
+ * The lines come from a repeating form, so they arrive as parallel arrays —
+ * every description, then every quantity. Zipping them here keeps the database
+ * function taking a clean structure rather than parsing form encoding.
+ */
+export async function raisePurchaseOrder(formData: FormData): Promise<void> {
+  const descriptions = formData.getAll('description').map(String);
+  const quantities = formData.getAll('qty').map(String);
+  const costs = formData.getAll('unit_cost').map(String);
+  const models = formData.getAll('model').map(String);
+  const items = formData.getAll('stock_item').map(String);
+
+  const lines = descriptions
+    .map((description, i) => ({
+      description,
+      qty: Number(quantities[i] ?? 0),
+      unit_cost: costs[i] ?? '',
+      model_id: models[i] || null,
+      stock_item_id: items[i] || null,
+    }))
+    .filter((l) => l.qty > 0 && (l.description.trim() || l.model_id || l.stock_item_id));
+
+  if (!lines.length) {
+    redirect('/purchase-orders/new?error=' + encodeURIComponent(
+      'Add at least one line with a quantity above zero.'));
+  }
+
+  const { data, error } = await sb().rpc('raise_purchase_order', {
+    p_supplier: String(formData.get('supplier') ?? '') || null,
+    p_destination: String(formData.get('destination') ?? ''),
+    p_lines: lines,
+    p_expected_on: String(formData.get('expected') ?? '') || null,
+    p_notes: String(formData.get('notes') ?? '') || null,
+  });
+
+  revalidatePath('/purchase-orders');
+  if (error) redirect('/purchase-orders/new?error=' + encodeURIComponent(error.message));
+  redirect(`/purchase-orders?raised=${encodeURIComponent((data as any)?.reference ?? '')}`);
+}
+
+export async function issuePurchaseOrder(id: string): Promise<void> {
+  const { error } = await sb().rpc('issue_purchase_order', { p_id: id });
+  revalidatePath('/purchase-orders');
+  redirect(error
+    ? `/purchase-orders?error=${encodeURIComponent(error.message)}`
+    : '/purchase-orders?issued=1');
+}
+
+export async function cancelPurchaseOrder(formData: FormData): Promise<void> {
+  const { error } = await sb().rpc('cancel_purchase_order', {
+    p_id: String(formData.get('id') ?? ''),
+    p_reason: String(formData.get('reason') ?? ''),
+  });
+  revalidatePath('/purchase-orders');
+  redirect(error
+    ? `/purchase-orders?error=${encodeURIComponent(error.message)}`
+    : '/purchase-orders?cancelled=1');
+}
+
+export async function saveApprovalPolicy(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/approvals?error=' + encodeURIComponent('No company in scope.'));
+
+  const naira = (k: string) => {
+    const v = String(formData.get(k) ?? '').replace(/[^\d]/g, '');
+    return v ? Number(v) * 100 : null;
+  };
+
+  const { error } = await supabase.rpc('set_approval_policy', {
+    p_company: co.id,
+    p_type: String(formData.get('type') ?? 'purchase'),
+    p_name: String(formData.get('name') ?? ''),
+    p_chain: formData.getAll('chain').map(String).filter(Boolean),
+    p_min_amount: naira('min_amount'),
+    p_max_amount: naira('max_amount'),
+    p_min_items: Number(formData.get('min_items') ?? 0) || null,
+    p_max_items: Number(formData.get('max_items') ?? 0) || null,
+    p_priority: Number(formData.get('priority') ?? 100),
+    p_id: String(formData.get('id') ?? '') || null,
+  });
+
+  revalidatePath('/approvals');
+  redirect(error ? `/approvals?error=${encodeURIComponent(error.message)}` : '/approvals?saved=1');
+}
+
+export async function deleteApprovalPolicy(id: string): Promise<void> {
+  const { error } = await sb().rpc('delete_approval_policy', { p_id: id });
+  revalidatePath('/approvals');
+  redirect(error ? `/approvals?error=${encodeURIComponent(error.message)}` : '/approvals?removed=1');
+}

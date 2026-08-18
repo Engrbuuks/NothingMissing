@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
-import { sb, canSeeFinancials, getSession, money } from '@/lib/session';
-import { receiveGoods } from '@/lib/actions';
+import { sb, canSeeFinancials, canWrite, getSession, money } from '@/lib/session';
+import { receiveGoods, cancelPurchaseOrder } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -150,6 +150,30 @@ export default async function PurchaseOrder({
 
       {p.status === 'received' && (
         <div className="notice"><p>This order is complete. The assets it created are on the register.</p></div>
+      )}
+      {p.status !== 'received' && p.status !== 'cancelled' && canWrite(session) && (
+        <div className="card" style={{ borderColor: 'var(--bad-soft)' }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t" style={{ color: 'var(--bad)' }}>Cancel this order</div>
+              <div className="card-s">
+                It stays on the record with your reason — an order that simply vanishes
+                answers nothing when somebody asks in six months
+              </div>
+            </div>
+          </div>
+          <form action={cancelPurchaseOrder}
+                style={{ padding: 20, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input type="hidden" name="id" value={p.id} />
+            <input className="inp" name="reason" required minLength={3}
+                   placeholder="Why — supplier could not deliver, no longer needed…"
+                   style={{ flex: 1, minWidth: 220 }} />
+            <button className="btn btn-g" type="submit"
+                    style={{ color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}>
+              Cancel the order
+            </button>
+          </form>
+        </div>
       )}
     </Shell>
   );

@@ -1,5 +1,6 @@
 import Shell from '@/components/Shell';
-import { sb, canSeeFinancials, getSession, money } from '@/lib/session';
+import { sb, canSeeFinancials, canWrite, getSession, money } from '@/lib/session';
+import { issuePurchaseOrder } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,12 +12,33 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   cancelled: { label: 'Cancelled', cls: 'p-mute' },
 };
 
-export default async function PurchaseOrders() {
+export default async function PurchaseOrders({
+  searchParams,
+}: { searchParams: { error?: string; raised?: string; issued?: string; cancelled?: string } }) {
   const session = await getSession();
 
   if (!canSeeFinancials(session)) {
     return (
       <Shell current="purchase-orders" title="Purchase orders" subtitle="Ordering and goods receipt">
+      {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+      {searchParams.raised && (
+        <div className="notice">
+          <p>
+            <b>{searchParams.raised} saved as a draft.</b> Nothing has gone to the supplier
+            yet — issue it when you are ready to commit.
+          </p>
+        </div>
+      )}
+      {searchParams.issued && <div className="notice"><p>Issued. The clock on the lead time starts now.</p></div>}
+      {searchParams.cancelled && <div className="notice warn"><p>Cancelled, with your reason on the record.</p></div>}
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        {canWrite(session) && (
+          <a className="btn btn-p" href="/purchase-orders/new">Raise an order</a>
+        )}
+        <a className="btn btn-g" href="/suppliers">Suppliers</a>
+      </div>
+
         <div className="card">
           <div className="empty">
             <h4>Not available to your role</h4>
@@ -74,7 +96,17 @@ export default async function PurchaseOrders() {
                       <td style={{ color: 'var(--text-2)' }}>{p.expected_on ?? '—'}</td>
                       <td><span className={`pill ${st.cls}`}><span className="pd" />{st.label}</span></td>
                       <td style={{ textAlign: 'right' }}>
-                        <a className="btn btn-g" href={`/purchase-orders/${p.id}`}>Open</a>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <a className="btn btn-g" href={`/purchase-orders/${p.id}`}>Open</a>
+                          {/* A draft is somebody thinking; issuing it is a
+                              commitment to a supplier, so it is a deliberate
+                              second action rather than a status you drift into. */}
+                          {p.status === 'draft' && canWrite(session) && (
+                            <form action={issuePurchaseOrder.bind(null, p.id)}>
+                              <button className="btn btn-p" type="submit">Issue</button>
+                            </form>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
