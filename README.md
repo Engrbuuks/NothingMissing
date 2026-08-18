@@ -1213,6 +1213,42 @@ which I would have shipped:
 `/purchase-orders/new` was built in 0031. If it is not working, **migration
 0031 has not been run** — `raise_purchase_order()` will not exist until it is.
 
+## Deleting somebody (0033)
+
+Seventeen tables referenced `app.profiles`, every one of them `NO ACTION`, so a
+profile could not be deleted at all — the database simply refused. There was
+`remove_member()`, which took away access and left the account behind, and
+nothing that actually removed a person.
+
+**Owner only.** An admin removing an admin — or removing the person who can
+remove them — is how a company loses control of itself. The confirmation is
+typing their name, because a dialogue somebody clicks through is not a
+confirmation and this is not undoable.
+
+**What goes:** their profile, memberships, view preferences, delegations,
+consents, any invitation they hold, and their Supabase login.
+
+**What survives:** every record of something they did. An approval they gave, a
+transfer they dispatched, a count they reviewed. Those belong to the company,
+not to the person — a transfer approved by somebody who has since left must
+keep saying so, or deleting a user becomes a way to unsign what they
+authorised.
+
+The audit log keeps `actor_label`, which is text, so it still reads *"Ngozi
+Okafor changed a role"* after the account is gone. Only the pointer to a live
+account is released, through the same narrow trigger exception 0015 added for
+deleted locations. Verified: the log is still refused every other kind of
+UPDATE and DELETE.
+
+**Their login only goes if they belong to no other company.** Somebody who
+works for two companies on this platform must not lose their account because
+one of them removed them.
+
+`deletion_preview()` shows what would happen before it happens — how many
+recorded actions, approvals and reviews would keep their name, and whether the
+account itself would go. Nobody should discover what a destructive action keeps
+by performing it.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

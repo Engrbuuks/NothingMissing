@@ -1489,3 +1489,59 @@ export async function logMaintenance(formData: FormData): Promise<void> {
     ? `/maintenance/new?error=${encodeURIComponent(error.message)}`
     : '/maintenance?logged=1');
 }
+
+/**
+ * Deleting somebody.
+ *
+ * Owner only, and the confirmation is typing their name — a dialogue somebody
+ * clicks through is not a confirmation, and this is not undoable.
+ *
+ * Two halves: the database removes everything scoped to them, and if they
+ * belong to no other company their Supabase login goes too. Without the second
+ * half they would keep an account that can sign in and see nothing, which
+ * looks like a bug to them and like a leak to you.
+ */
+export async function deletePerson(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const userId = String(formData.get('user') ?? '');
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/people?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('delete_person', {
+    p_company: (co as any).id,
+    p_user: userId,
+    p_confirm: String(formData.get('confirm') ?? ''),
+  });
+
+  revalidatePath('/people');
+  if (error) redirect(`/people?error=${encodeURIComponent(error.message)}`);
+
+  const result = (data as any) ?? {};
+
+  // Their login only goes if the database confirmed they belong nowhere else.
+  // Somebody who works for two companies here must not lose their account
+  // because one of them removed them.
+  if (result.account_removed) {
+    const { adminConfigured, adminAuth } = await import('./admin');
+    if (adminConfigured()) {
+      try {
+        await adminAuth().auth.admin.deleteUser(userId);
+      } catch (e) {
+        // The company data is already gone, which is what was asked for. A
+        // stranded auth user can sign in and see nothing, so it is worth
+        // knowing about but not worth failing the whole action over.
+        reportError(e, { route: 'delete-person', userId });
+      }
+    }
+  }
+
+  redirect(`/people?deleted=${encodeURIComponent(result.name ?? 'That person')}`);
+}
+
+export async function deleteInvitation(id: string): Promise<void> {
+  const { data, error } = await sb().rpc('delete_invitation', { p_id: id });
+  revalidatePath('/people');
+  redirect(error
+    ? `/people?error=${encodeURIComponent(error.message)}`
+    : `/people?deleted=${encodeURIComponent((data as any)?.email ?? 'The invitation')}`);
+}

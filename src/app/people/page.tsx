@@ -2,7 +2,7 @@ import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
 import { issueLink, revokeLink, setMemberRole, inviteMember,
          revokeInvitation, resendInvitation, removeMember,
-         deleteLinkHolder } from '@/lib/actions';
+         deleteLinkHolder, deletePerson, deleteInvitation } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,10 +16,13 @@ const VERBS: [string, string][] = [
 
 export default async function People({
   searchParams,
-}: { searchParams: { token?: string; slug?: string; error?: string; role?: string; invite?: string; invited?: string } }) {
+}: { searchParams: { token?: string; slug?: string; error?: string; role?: string; invite?: string; invited?: string; deleted?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const isAdmin = hasRole(session, 'owner', 'admin');
+  // Deleting is owner-only. An admin removing an admin — or removing the
+  // person who can remove them — is how a company loses control of itself.
+  const isOwner = hasRole(session, 'owner');
 
   const { data: members } = await supabase
     .from('memberships')
@@ -62,6 +65,15 @@ export default async function People({
     <Shell current="people" title="People" subtitle="Accounts, and the people who hold a link instead">
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.role && <div className="notice"><p>Role updated.</p></div>}
+      {searchParams.deleted && (
+        <div className="notice warn">
+          <p>
+            <b>{searchParams.deleted} deleted.</b> Their account, membership and settings are
+            gone. Anything they did keeps their name in the audit log — that record belongs to
+            the company, and deleting a person is not a way to unsign what they approved.
+          </p>
+        </div>
+      )}
 
       {owners === 1 && isAdmin && (
         <div className="notice warn">
@@ -161,13 +173,31 @@ export default async function People({
                                 style={{ padding: '6px 11px', fontSize: 12.5 }}>Set</button>
                       </form>
                       {m.user_id !== session?.userId && (
-                        <form action={removeMember.bind(null, m.user_id)}
-                              style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
-                          <button className="btn btn-g" type="submit"
-                                  style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
-                            Remove from company
-                          </button>
-                        </form>
+                        <div style={{ marginTop: 6, display: 'grid', gap: 6, justifyItems: 'end' }}>
+                          <form action={removeMember.bind(null, m.user_id)}>
+                            <button className="btn btn-g" type="submit"
+                                    style={{ padding: '5px 10px', fontSize: 12 }}>
+                              Remove access
+                            </button>
+                          </form>
+
+                          {/* Owner only, and typing the name is the
+                              confirmation — a dialogue somebody clicks through
+                              is not a confirmation, and this is not undoable. */}
+                          {isOwner && (
+                            <form action={deletePerson}
+                                  style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <input type="hidden" name="user" value={m.user_id} />
+                              <input className="inp" name="confirm" required
+                                     placeholder="Type their name to delete"
+                                     style={{ width: 190, padding: '5px 9px', fontSize: 12 }} />
+                              <button className="btn btn-g" type="submit"
+                                      style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                                Delete
+                              </button>
+                            </form>
+                          )}
+                        </div>
                       )}
                     </td>
                   )}
@@ -294,8 +324,16 @@ export default async function People({
                             {i.state === 'waiting' && (
                               <form action={revokeInvitation.bind(null, i.id)}>
                                 <button className="btn btn-g" type="submit"
-                                        style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                                        style={{ padding: '5px 10px', fontSize: 12 }}>
                                   Withdraw
+                                </button>
+                              </form>
+                            )}
+                            {isOwner && (
+                              <form action={deleteInvitation.bind(null, i.id)}>
+                                <button className="btn btn-g" type="submit"
+                                        style={{ padding: '5px 10px', fontSize: 12, color: 'var(--bad)' }}>
+                                  Delete
                                 </button>
                               </form>
                             )}
