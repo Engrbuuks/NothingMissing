@@ -58,6 +58,11 @@ jobs:
       - name: authentication is wired end to end
         run: node tests-auth.mjs
 
+      # A settings toggle for an event nothing sends describes something that
+      # does not happen. Twelve of these shipped that way.
+      - name: promised notifications actually send
+        run: node tests-notify.mjs
+
       # A link to a route that does not exist is a dead end a user hits, and
       # nothing else catches it — the build compiles happily.
       - name: internal links resolve
@@ -67,6 +72,11 @@ jobs:
       # The callback route was missing entirely and nothing caught it.
       - name: authentication is wired end to end
         run: node tests-auth.mjs
+
+      # A settings toggle for an event nothing sends describes something that
+      # does not happen. Twelve of these shipped that way.
+      - name: promised notifications actually send
+        run: node tests-notify.mjs
 
   database:
     name: schema, RLS and 271 assertions

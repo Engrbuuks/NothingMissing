@@ -1,6 +1,8 @@
 'use server';
 
 import { parseSheet } from './sheet';
+import { reportError } from './report-error';
+import { announce } from './notify';
 
 /**
  * Server actions for movement.
@@ -107,6 +109,26 @@ export async function dispatchTransfer(id: string): Promise<void> {
     p_transfer: id,
   });
 
+  // Tell the destination. A consignment nobody is expecting is a consignment
+  // that sits on a lorry, and this is the event the whole product exists for.
+  const { data: t } = await supabase
+    .from('transfers')
+    .select('company_id, reference, waybill_no, to:to_location ( name ), from:from_location ( name ), transfer_lines ( count )')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (t) {
+    const tr = t as any;
+    await announce({
+      companyId: tr.company_id,
+      event: 'transfer.dispatched',
+      subject: `${tr.waybill_no ?? tr.reference} is on its way to ${tr.to?.name ?? 'you'}`,
+      body: `${tr.transfer_lines?.[0]?.count ?? 0} asset(s) left ${tr.from?.name ?? 'the origin'} `
+          + `and are now in transit. Nothing joins your register until somebody at the `
+          + `destination confirms what physically arrived.`,
+    });
+  }
+
   revalidatePath(`/transfers/${id}`);
   revalidatePath('/assets');
 
@@ -129,12 +151,34 @@ export async function acceptTransfer(formData: FormData): Promise<void> {
   const id = String(formData.get('id') ?? '');
   const flagged = formData.getAll('flag').map(String);
   const notes = String(formData.get('notes') ?? '');
+  const supabase = sb();
 
-  const { error } = await sb().rpc('accept_transfer', {
+  const { error } = await supabase.rpc('accept_transfer', {
     p_transfer: id,
     p_flagged: flagged,
     p_notes: notes || null,
   });
+
+  // Anything short became a discrepancy with an owner and a clock. This is
+  // the one event a company cannot switch off, because silencing it is how a
+  // company discovers its own losses months later.
+  if (flagged.length > 0) {
+    const { data: t } = await supabase
+      .from('transfers')
+      .select('company_id, reference, waybill_no, to:to_location ( name )')
+      .eq('id', id).maybeSingle();
+    if (t) {
+      const tr = t as any;
+      await announce({
+        companyId: tr.company_id,
+        event: 'discrepancy.opened',
+        subject: `${flagged.length} item(s) short on ${tr.waybill_no ?? tr.reference}`,
+        body: `Received at ${tr.to?.name ?? 'the destination'} with ${flagged.length} `
+            + `line(s) flagged. Each is now an open discrepancy with somebody's name `
+            + `against it and a clock running.`,
+      });
+    }
+  }
 
   revalidatePath(`/transfers/${id}`);
   revalidatePath('/transfers');
@@ -652,22 +696,147 @@ export async function createCompanyAccount(formData: FormData): Promise<void> {
   redirect((data as any)?.url ?? '/');
 }
 
+/**
+ * Inviting somebody to sign in.
+ *
+ * The old version created an invitation row and handed the link back to the
+ * inviter to copy and send themselves. That is not an invitation system — it
+ * is a token generator with homework, and it meant nobody was ever invited.
+ *
+ * Now the email is sent. Two paths, because the right one depends on whether
+ * the person already has an account:
+ *
+ *   * NO ACCOUNT — Supabase's admin invite creates the user and emails a link
+ *     that sets their password. They never see a sign-up page, which is what
+ *     made the old flow look like company registration.
+ *
+ *   * ALREADY HAS AN ACCOUNT — a colleague at another company, or somebody
+ *     re-invited. Supabase would refuse to create them again, so we send our
+ *     own email with the join link instead.
+ *
+ * If neither can send, the link is still shown. A missing key should slow
+ * somebody down, not stop them.
+ */
 export async function inviteMember(formData: FormData): Promise<void> {
   const supabase = sb();
-  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  const { data: co } = await supabase
+    .from('companies').select('id, name').limit(1).maybeSingle();
   if (!co) redirect('/people?error=' + encodeURIComponent('No company in scope.'));
 
+  const email = String(formData.get('email') ?? '').trim().toLowerCase();
+  const role = String(formData.get('role') ?? 'requester');
+
+  // The invitation row carries the role and location. It is the record of who
+  // was invited to what, and it is what the person accepts against.
   const { data, error } = await supabase.rpc('invite_member', {
-    p_company: co.id,
-    p_email: String(formData.get('email') ?? ''),
-    p_role: String(formData.get('role') ?? 'requester'),
+    p_company: (co as any).id,
+    p_email: email,
+    p_role: role,
     p_location: String(formData.get('location') ?? '') || null,
   });
 
   revalidatePath('/people');
   if (error) redirect('/people?error=' + encodeURIComponent(error.message));
-  // Shown once. Nothing but the hash is stored, so it cannot be retrieved.
-  redirect(`/people?invite=${encodeURIComponent((data as any)?.path ?? '')}`);
+
+  const path = (data as any)?.path ?? '';
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
+  const joinUrl = `https://${root}${path}`;
+  const company = (co as any).name as string;
+
+  const sent = await sendInvitationEmail({ email, role, company, joinUrl, root });
+
+  redirect(sent
+    ? `/people?invited=${encodeURIComponent(email)}`
+    // Only when nothing could send. The link is the fallback, not the plan.
+    : `/people?invite=${encodeURIComponent(path)}`);
+}
+
+/**
+ * Sends the invitation. Returns false only if every route failed, so the
+ * caller can fall back to showing the link.
+ */
+async function sendInvitationEmail(m: {
+  email: string; role: string; company: string; joinUrl: string; root: string;
+}): Promise<boolean> {
+  const { adminConfigured, adminAuth } = await import('./admin');
+
+  // Path one: they have no account. Supabase creates the user and emails a
+  // link that sets a password — no sign-up page, no chance of them thinking
+  // they are registering a company.
+  if (adminConfigured()) {
+    try {
+      const { error } = await adminAuth().auth.admin.inviteUserByEmail(m.email, {
+        redirectTo: `https://${m.root}/auth/callback`,
+        data: { invited_to: m.company, invited_as: m.role },
+      });
+      if (!error) return true;
+
+      // "already been registered" is expected for an existing user, and is
+      // not a failure — it just means the other path applies.
+      if (!/already|registered|exists/i.test(error.message)) {
+        reportError(error, { route: 'invite-admin' });
+      }
+    } catch (e) {
+      reportError(e, { route: 'invite-admin' });
+    }
+  }
+
+  // Path two: they already have an account, so they need the join link rather
+  // than a password-setting one.
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: process.env.NOTIFY_FROM ?? `Nothing Missing <no-reply@${m.root}>`,
+          to: [m.email],
+          subject: `${m.company} has invited you`,
+          html: invitationHtml(m),
+        }),
+      });
+      if (res.ok) return true;
+      reportError(new Error(`Resend returned ${res.status}`), { route: 'invite-resend' });
+    } catch (e) {
+      reportError(e, { route: 'invite-resend' });
+    }
+  }
+
+  return false;
+}
+
+function invitationHtml(m: { company: string; role: string; joinUrl: string }) {
+  const esc = (s: string) =>
+    s.replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+  return `<!doctype html><html><body style="margin:0;background:#F4F6FB;padding:28px 16px;
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#061F3E">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="100%" style="max-width:520px;background:#fff;
+      border-radius:16px;padding:30px" cellpadding="0" cellspacing="0">
+      <tr><td style="font-size:12px;font-weight:700;color:#0551BD;letter-spacing:.08em;
+        text-transform:uppercase;padding-bottom:16px">Nothing Missing</td></tr>
+      <tr><td style="font-size:20px;font-weight:700;letter-spacing:-.02em;padding-bottom:12px">
+        ${esc(m.company)} has invited you</td></tr>
+      <tr><td style="font-size:14.5px;line-height:1.62;color:#5F6379;padding-bottom:22px">
+        You have been invited to join their asset register as
+        <b>${esc(m.role)}</b>. Opening the link below adds you to their company —
+        it does not create one of your own.</td></tr>
+      <tr><td style="padding-bottom:22px">
+        <a href="${m.joinUrl}" style="display:inline-block;background:#0551BD;color:#fff;
+          text-decoration:none;padding:12px 22px;border-radius:10px;font-size:14.5px;
+          font-weight:600">Accept the invitation</a></td></tr>
+      <tr><td style="font-size:12px;color:#9296AC;line-height:1.55">
+        The link expires in 14 days and only opens for this email address, so
+        forwarding it will not let anybody else in.<br><br>
+        If you were not expecting this, ignore it — nothing happens until you
+        open the link.</td></tr>
+    </table>
+  </td></tr></table></body></html>`;
 }
 
 export async function revokeInvitation(id: string): Promise<void> {
@@ -1160,11 +1329,30 @@ export async function renameCompany(formData: FormData): Promise<void> {
 }
 
 export async function resendInvitation(id: string): Promise<void> {
-  const { data, error } = await sb().rpc('resend_invitation', { p_id: id });
+  const supabase = sb();
+  const { data, error } = await supabase.rpc('resend_invitation', { p_id: id });
   revalidatePath('/people');
-  redirect(error
-    ? `/people?error=${encodeURIComponent(error.message)}`
-    : `/people?invite=${encodeURIComponent((data as any)?.path ?? '')}`);
+  if (error) redirect(`/people?error=${encodeURIComponent(error.message)}`);
+
+  const { data: co } = await supabase
+    .from('companies').select('name').limit(1).maybeSingle();
+  const { data: inv } = await supabase
+    .from('invitations').select('email, role').eq('id', id).maybeSingle();
+
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
+  const path = (data as any)?.path ?? '';
+
+  const sent = await sendInvitationEmail({
+    email: (inv as any)?.email ?? '',
+    role: (inv as any)?.role ?? 'member',
+    company: (co as any)?.name ?? 'A company',
+    joinUrl: `https://${root}${path}`,
+    root,
+  });
+
+  redirect(sent
+    ? `/people?invited=${encodeURIComponent((inv as any)?.email ?? '')}`
+    : `/people?invite=${encodeURIComponent(path)}`);
 }
 
 /**

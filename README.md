@@ -1094,6 +1094,44 @@ company by mistake.
 The message check caught one of my own new bugs while I was writing this: an
 error from `acceptMyInvitation` redirected to a page that never displayed it.
 
+## Invitations actually send (no migration)
+
+**The invitation system generated a token and handed it back to be copied.**
+That is not an invitation system — it is a token generator with homework, and
+it meant in practice nobody was invited.
+
+Now the email goes out, by whichever route fits:
+
+- **No account yet** → Supabase's admin invite creates the user and emails a
+  link that sets their password. They never see a sign-up page at all, which is
+  what made staff registration look like company registration.
+- **Already has an account** → a branded Resend email with the join link,
+  because Supabase would refuse to create them twice.
+- **Neither configured** → the link is shown, marked as a fallback rather than
+  the plan.
+
+`/sign-up` now says plainly that it starts a *company*, and points anybody
+who was invited at their email instead. The join page no longer offers
+sign-up at all, because by then the account already exists.
+
+## Twelve notifications that never sent
+
+`notify()` was fully built, `notification_prefs` seeded twelve events, the
+settings page listed them — and **nothing in the application ever called it**.
+A company could switch a notification on, see it in the list, and never receive
+one. The toggle described something that did not happen.
+
+`announce()` now wires the two the product is sold on: a dispatch, so the
+destination knows a consignment is coming, and a discrepancy, which is the one
+event a company cannot switch off. The other ten remain unwired and
+`tests-notify.mjs` reports them by name on every run, so they are visible
+rather than forgotten.
+
+This is the third time a complete, working, tested feature shipped with nothing
+calling it. The reachability checks now cover server actions, database
+functions, forms, redirect messages and notification events — each one added
+after the same mistake.
+
 ## Status
 
 Every screen is built and reading live data: assets, catalog, inventory,

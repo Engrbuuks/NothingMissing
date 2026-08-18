@@ -199,3 +199,43 @@ const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!)
   );
+
+/**
+ * Announce an event to whoever should hear about it.
+ *
+ * Twelve events had a preference row and a settings toggle from the start, and
+ * `notify()` was never called for any of them — so a company could turn a
+ * notification on, see it listed, and never receive one. The toggle described
+ * something that did not happen.
+ *
+ * Deliberately never throws. A transfer that dispatched successfully must not
+ * appear to fail because an email provider was slow, and a notification is
+ * always recoverable from the queue.
+ */
+export async function announce(params: {
+  companyId: string;
+  event: string;
+  subject: string;
+  body: string;
+  roles?: string[];
+}): Promise<void> {
+  try {
+    const roles = params.roles ?? ['owner', 'admin', 'manager'];
+    const to = await recipientsFor(params.companyId, params.event, roles);
+
+    // No recipients is a normal outcome — the company turned it off, or
+    // nobody holds a role that should hear about it.
+    for (const recipient of to) {
+      await notify({
+        companyId: params.companyId,
+        event: params.event,
+        channel: 'email',
+        recipient,
+        subject: params.subject,
+        body: params.body,
+      });
+    }
+  } catch {
+    /* never let telling somebody break the thing that happened */
+  }
+}

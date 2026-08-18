@@ -52,17 +52,17 @@ export default async function Join({
         <>
           <div className="notice" style={{ marginTop: 18 }}>
             <p>
-              Sign in as <b>{inv.email}</b> to accept. If you have no account yet, create one
-              with <b>that same address</b> — the invitation only opens for it.
+              Sign in as <b>{inv.email}</b> to accept.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <a className="btn btn-p" href="/sign-in">Sign in</a>
-            <a className="btn btn-g" href="/sign-up?joining=1">Create an account</a>
+            <a className="btn btn-g" href="/auth/reset">Set a password</a>
           </div>
           <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 16, lineHeight: 1.6 }}>
-            Creating an account does <b>not</b> start a company of your own. Once your email
-            is confirmed you will be brought straight back here to join {inv.company}.
+            Your invitation email created your account already — use{' '}
+            <b>Set a password</b> if you have not chosen one yet. You are joining{' '}
+            {inv.company}, not starting a company of your own.
           </p>
         </>
       ) : wrongAccount ? (

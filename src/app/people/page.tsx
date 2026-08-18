@@ -16,7 +16,7 @@ const VERBS: [string, string][] = [
 
 export default async function People({
   searchParams,
-}: { searchParams: { token?: string; slug?: string; error?: string; role?: string; invite?: string } }) {
+}: { searchParams: { token?: string; slug?: string; error?: string; role?: string; invite?: string; invited?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const isAdmin = hasRole(session, 'owner', 'admin');
@@ -194,11 +194,23 @@ export default async function People({
             </div>
           </div>
 
-          {searchParams.invite && (
+          {searchParams.invited && (
             <div className="notice" style={{ margin: 16 }}>
+              <p>
+                <b>Invitation emailed to {searchParams.invited}.</b> They set their own
+                password from the link — they never see a sign-up page, so there is no way
+                for them to start a company by mistake. It expires in 14 days.
+              </p>
+            </div>
+          )}
+
+          {/* Only shown when no email could be sent. The link is the fallback,
+              not the plan — copying it by hand is how nobody gets invited. */}
+          {searchParams.invite && (
+            <div className="notice warn" style={{ margin: 16 }}>
               <p style={{ marginBottom: 8 }}>
-                <b>Send them this link.</b> It works once, expires in 14 days, and only opens
-                for the address you sent it to.
+                <b>Email is not configured, so send them this link yourself.</b> It expires in
+                14 days and only opens for the address you invited.
               </p>
               <code className="mono" style={{ display: 'block', wordBreak: 'break-all',
                     background: 'var(--surface)', padding: '10px 12px', borderRadius: 10,
@@ -206,7 +218,9 @@ export default async function People({
                 https://{root}{searchParams.invite}
               </code>
               <p className="hint" style={{ marginTop: 8 }}>
-                Shown once — only a hash is stored, so it cannot be retrieved later.
+                Shown once — only a hash is stored, so it cannot be retrieved later. Set
+                <span className="mono"> SUPABASE_SERVICE_ROLE_KEY </span> or
+                <span className="mono"> RESEND_API_KEY </span> and these send automatically.
               </p>
             </div>
           )}
