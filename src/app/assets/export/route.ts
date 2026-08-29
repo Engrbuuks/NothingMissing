@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     .select(
       `id, tag, name, serial_no, status, holder, acquired_on, meter_value, meter_unit,
        locations ( name ),
+       sub_categories ( name, categories ( id, name ) ),
        models ( name, brands ( name ), sub_categories ( name, categories ( id, name ) ) )`
     )
     .order('tag');
@@ -46,7 +47,11 @@ export async function GET(request: Request) {
   }
 
   let rows = (data ?? []) as any[];
-  if (cat) rows = rows.filter((a) => a.models?.sub_categories?.categories?.id === cat);
+  if (cat)
+    rows = rows.filter(
+      (a) =>
+        (a.models?.sub_categories?.categories?.id ?? a.sub_categories?.categories?.id) === cat,
+    );
 
   // Ask for costs. An empty result means the role cannot see them, so the
   // column is dropped entirely rather than exported full of blanks — a blank
@@ -68,7 +73,7 @@ export async function GET(request: Request) {
     const f = costs.get(a.id);
     const cells = [
       a.tag, a.name, a.serial_no,
-      a.models?.sub_categories?.categories?.name,
+      a.models?.sub_categories?.categories?.name ?? a.sub_categories?.categories?.name,
       a.models?.brands?.name, a.models?.name,
       a.status === 'transit' ? 'In transit' : a.locations?.name,
       a.status, a.holder, a.acquired_on, a.meter_value, a.meter_unit,

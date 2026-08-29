@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canSeeFinancials, canWrite, money } from '@/lib/session';
-import { handOver, disposeAsset, saveAssetAttribute, returnAssetToStock } from '@/lib/actions';
+import { handOver, disposeAsset, saveAssetAttribute, returnAssetToStock,
+         classifyAsset } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,23 @@ export default async function AssetDetail({
 
   // Countable items only: the return card offers somewhere for this thing to
   // go back to, and diesel is never that place.
+  // One answer to "what kind of thing is this", from the catalog model when
+  // there is one and from the asset itself when there is not.
+  const { data: cls } = await supabase
+    .from('asset_classification')
+    .select('category_name, type_name, classified_by')
+    .eq('asset_id', a.id)
+    .maybeSingle();
+  const klass = (cls ?? {}) as
+    { category_name?: string; type_name?: string; classified_by?: string };
+
+  // Offered only when nothing else answers the question.
+  const { data: typeRows } = klass.classified_by === 'model'
+    ? { data: [] }
+    : await supabase.from('sub_categories')
+        .select('id, name, categories ( name )').order('name');
+  const types = typeRows ?? [];
+
   const { data: stockRows } = await supabase
     .from('stock_items')
     .select('id, sku, name')
@@ -184,6 +202,17 @@ export default async function AssetDetail({
                 <td className="mono">{a.serial_no ?? '—'}</td>
               </tr>
               <tr>
+                <td style={{ color: 'var(--text-3)' }}>Category</td>
+                <td>{klass.category_name ?? '—'}</td>
+                <td style={{ color: 'var(--text-3)' }}>Type</td>
+                <td>
+                  {klass.type_name ?? '—'}
+                  {klass.classified_by === 'model' && (
+                    <span className="hint" style={{ marginTop: 2 }}>from the catalog model</span>
+                  )}
+                </td>
+              </tr>
+              <tr>
                 <td style={{ color: 'var(--text-3)' }}>Location</td>
                 <td>{a.status === 'transit' ? 'In transit' : a.locations?.name ?? '—'}</td>
                 <td style={{ color: 'var(--text-3)' }}>Assigned to</td>
@@ -283,6 +312,43 @@ export default async function AssetDetail({
               </select>
             </div>
             <button className="btn btn-p" type="submit">Record the handover</button>
+          </form>
+        </div>
+      )}
+
+      {/* An asset with no catalog model has no category unless it is set here.
+          That is the ordinary case now that a model is optional, and an
+          unclassified register is one nobody can group, filter or report on. */}
+      {canWrite(session) && klass.classified_by !== 'model' && types.length > 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">
+                {klass.classified_by === 'asset' ? 'Change the type' : 'Classify this asset'}
+              </div>
+              <div className="card-s">
+                This asset is not in the catalog, so nothing else says what kind of thing it
+                is. Setting a type puts it in a category on the register and the dashboard.
+              </div>
+            </div>
+          </div>
+          <form
+            action={classifyAsset}
+            style={{ padding: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}
+          >
+            <input type="hidden" name="asset" value={a.id} />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <label className="lbl" htmlFor="cls-type">Category and type</label>
+              <select className="inp" id="cls-type" name="sub_category" defaultValue="">
+                <option value="">Not classified</option>
+                {types.map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {t.categories?.name ? `${t.categories.name} → ` : ''}{t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="btn btn-p" type="submit">Save the type</button>
           </form>
         </div>
       )}

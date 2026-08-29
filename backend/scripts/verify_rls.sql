@@ -15,15 +15,37 @@ begin
     raise exception 'tables without RLS enabled and forced: %', v_bad;
   end if;
 
-  -- 2. every table carrying company_id must have at least one policy
+  -- 2. every BASE TABLE carrying company_id must have at least one policy.
+  --    Views are excluded here and checked separately below: a view cannot
+  --    carry a policy at all, so demanding one of it reports a fault that
+  --    cannot be fixed — and a check with no valid fix gets worked around.
   select string_agg(t.table_name, ', ') into v_bad
   from information_schema.columns t
+  join pg_class c on c.relname = t.table_name
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'app'
   where t.table_schema = 'app' and t.column_name = 'company_id'
+    and c.relkind = 'r'
     and not exists (
       select 1 from pg_policies p
       where p.schemaname = 'app' and p.tablename = t.table_name);
   if v_bad is not null then
     raise exception 'tenant tables with no policy at all: %', v_bad;
+  end if;
+
+  -- 2b. every view in app must be security_invoker. This is the view-shaped
+  --     version of the same hole: a view runs as its OWNER by default, so it
+  --     reads its base tables with the owner's rights and the caller's RLS
+  --     never applies. One tenant-scoped view without this flag exposes every
+  --     company's rows to every authenticated user, and nothing about the
+  --     query looks wrong.
+  select string_agg(c.relname, ', ') into v_bad
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'app' and c.relkind = 'v'
+    and coalesce(
+      (select option_value from pg_options_to_table(c.reloptions)
+        where option_name = 'security_invoker'), 'false') <> 'true';
+  if v_bad is not null then
+    raise exception 'views that bypass RLS (need security_invoker=true): %', v_bad;
   end if;
 
   -- 3. no INSERT or UPDATE policy may omit WITH CHECK. This is the one that

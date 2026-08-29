@@ -24,7 +24,13 @@ const sql = readdirSync('backend/supabase/migrations')
   .map(f => readFileSync(join('backend/supabase/migrations', f), 'utf8')).join('\n');
 
 const fns = new Set([...sql.matchAll(/create or replace function app\.(\w+)/g)].map(m => m[1]));
-const tables = new Set([...sql.matchAll(/create table if not exists app\.(\w+)/g)].map(m => m[1]));
+// Tables and views both. PostgREST serves a view exactly like a table, so a
+// page selecting from one is doing something legitimate — reporting it as a
+// missing table sends somebody looking for a bug that is not there.
+const tables = new Set([
+  ...[...sql.matchAll(/create table if not exists app\.(\w+)/g)].map(m => m[1]),
+  ...[...sql.matchAll(/create (?:or replace )?view app\.(\w+)/g)].map(m => m[1]),
+]);
 
 const missingFns = new Map(), missingTables = new Map();
 for (const f of files) {

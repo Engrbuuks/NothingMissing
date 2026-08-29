@@ -55,6 +55,7 @@ export default async function Dashboard() {
     .from('assets')
     .select(`id, tag, name, status, acquired_on, location_id,
              locations ( name ),
+             sub_categories ( name, categories ( name ) ),
              models ( name, service_life_years, warranty_months,
                       brands ( name ),
                       sub_categories ( name, categories ( name ) ) )`);
@@ -118,7 +119,9 @@ export default async function Dashboard() {
 
   const catMap = new Map<string, any[]>();
   for (const a of live) {
-    const n = a.models?.sub_categories?.categories?.name ?? 'Uncategorised';
+    const n = a.models?.sub_categories?.categories?.name
+           ?? a.sub_categories?.categories?.name
+           ?? 'Uncategorised';
     catMap.set(n, [...(catMap.get(n) ?? []), a]);
   }
   const cats = [...catMap.entries()]

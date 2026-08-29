@@ -38,6 +38,7 @@ export default async function Assets({
     .select(
       `id, tag, name, serial_no, status, location_id, holder, acquired_on,
        locations ( name, colour_hex ),
+       sub_categories ( categories ( id, name ) ),
        models ( name, brands ( name ), sub_categories ( categories ( id, name ) ) )`
     )
     .order('tag')
@@ -59,7 +60,12 @@ export default async function Assets({
   // Category sits two joins away and PostgREST cannot filter on a nested
   // relation's parent, so this one narrows after the fetch.
   if (fcat !== 'all') {
-    rows = rows.filter((a) => a.models?.sub_categories?.categories?.id === fcat);
+    // Either source: the model's category when catalogued, the asset's own
+    // when not. Exactly one is ever set, so there is nothing to reconcile.
+    rows = rows.filter(
+      (a) =>
+        (a.models?.sub_categories?.categories?.id ?? a.sub_categories?.categories?.id) === fcat,
+    );
   }
 
   const [{ data: cats }, { data: locs }] = await Promise.all([
@@ -209,7 +215,7 @@ export default async function Assets({
               <tbody>
                 {rows.map((a) => {
                   const st = ST[a.status] ?? ST.idle;
-                  const cat = a.models?.sub_categories?.categories;
+                  const cat = a.models?.sub_categories?.categories ?? a.sub_categories?.categories;
                   const cc = catColour(cat?.id);
                   return (
                     <tr key={a.id}>

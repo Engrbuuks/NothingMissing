@@ -750,9 +750,15 @@ export async function createAsset(formData: FormData): Promise<void> {
   // trigger from app.next_asset_tag(), and a blank serial becomes null there
   // too — doing either here would mean the form and the spreadsheet import
   // could drift apart, which is exactly how the two paths disagreed before.
+  // The type, for assets with no catalog model. Sent regardless; the database
+  // trigger clears it when a model is attached, so the model always wins and
+  // the two can never disagree about what kind of thing this is.
+  const subCategory = String(formData.get('sub_category') ?? '').trim() || null;
+
   const common = {
     company_id: companyId,
     name,
+    sub_category_id: subCategory,
     description: String(formData.get('description') ?? '').trim() || null,
     model_id: model || null,
     location_id: location,
@@ -806,6 +812,26 @@ export async function createAsset(formData: FormData): Promise<void> {
   // A batch goes to the register, where all of them are visible at once.
   if (quantity === 1) redirect(`/assets/${asset.id}?added=1`);
   redirect(`/assets?added=${quantity}`);
+}
+
+/**
+ * Set or clear the type of an asset that has no catalog model.
+ *
+ * An asset reaches its category through the catalog when it is catalogued.
+ * When it is not — and that is now the ordinary case, since a model is
+ * optional — this is the only way it gets one, and without it the register
+ * fills with things nobody can group, filter or report on.
+ */
+export async function classifyAsset(formData: FormData): Promise<void> {
+  const asset = String(formData.get('asset') ?? '');
+  const { error } = await sb().rpc('classify_asset', {
+    p_asset: asset,
+    p_sub_category: String(formData.get('sub_category') ?? '') || null,
+  });
+  revalidatePath(`/assets/${asset}`);
+  revalidatePath('/assets');
+  if (error) redirect(`/assets/${asset}?error=${encodeURIComponent(error.message)}`);
+  redirect(`/assets/${asset}?saved=1`);
 }
 
 export async function createCategory(formData: FormData): Promise<void> {
