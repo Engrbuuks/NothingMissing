@@ -100,7 +100,14 @@ export default async function Assets({
           <p><b>{searchParams.imported} assets imported.</b> Each is on the register with an audit row against it.</p>
         </div>
       )}
-      {searchParams.added && <div className="notice"><p>Added to the register.</p></div>}
+      {searchParams.added && (
+        <div className="notice">
+          <p>
+            <b>{searchParams.added} assets added.</b> Each has its own tag and its own
+            history from here — they can be moved, repaired and disposed of separately.
+          </p>
+        </div>
+      )}
       {searchParams.disposed && (
         <div className="notice warn">
           <p>Disposed of. It has left every live register but stays in the history.</p>

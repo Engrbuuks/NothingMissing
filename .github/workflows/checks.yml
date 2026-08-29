@@ -18,6 +18,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
           NEXT_PUBLIC_ROOT_DOMAIN: nothingmissing.ng
 
+      # Two files sharing a migration number apply in whatever order the
+      # shell globs them, and by hand in the SQL editor there is no order at
+      # all. This shipped at 0019 and again at 0028.
+      - name: migration numbering is unambiguous
+        run: node tests-migrations.mjs
+
       # The storage layer is where all file access control now lives, because
       # R2 cannot check it a second time the way Supabase policies did.
       - name: storage access control
@@ -63,23 +69,8 @@ jobs:
       - name: promised notifications actually send
         run: node tests-notify.mjs
 
-      # A link to a route that does not exist is a dead end a user hits, and
-      # nothing else catches it — the build compiles happily.
-      - name: internal links resolve
-        run: node tests-links.mjs
-
-      # Authentication is the one path where a mistake locks everyone out.
-      # The callback route was missing entirely and nothing caught it.
-      - name: authentication is wired end to end
-        run: node tests-auth.mjs
-
-      # A settings toggle for an event nothing sends describes something that
-      # does not happen. Twelve of these shipped that way.
-      - name: promised notifications actually send
-        run: node tests-notify.mjs
-
   database:
-    name: schema, RLS and 271 assertions
+    name: schema, RLS and the assertion suite
     runs-on: ubuntu-latest
     services:
       postgres:

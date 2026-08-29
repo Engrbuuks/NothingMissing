@@ -218,10 +218,26 @@ export async function announce(params: {
   subject: string;
   body: string;
   roles?: string[];
+  /**
+   * Addresses to reach regardless of role. The person who raised a request is
+   * usually a requester, and requesters are not on any approval alert — so
+   * without this the one person waiting on an answer is the one person the
+   * outcome never reaches.
+   */
+  also?: (string | null | undefined)[];
 }): Promise<void> {
   try {
     const roles = params.roles ?? ['owner', 'admin', 'manager'];
-    const to = await recipientsFor(params.companyId, params.event, roles);
+    const byRole = await recipientsFor(params.companyId, params.event, roles);
+
+    // `also` still honours the company's preference — recipientsFor returns
+    // nothing when the event is switched off, and a direct address must not
+    // become a way around a setting somebody deliberately turned off.
+    const named = byRole.length === 0 && !(await eventIsOn(params.companyId, params.event))
+      ? []
+      : (params.also ?? []).filter((a): a is string => Boolean(a));
+
+    const to = [...new Set([...byRole, ...named])];
 
     // No recipients is a normal outcome — the company turned it off, or
     // nobody holds a role that should hear about it.
@@ -238,4 +254,15 @@ export async function announce(params: {
   } catch {
     /* never let telling somebody break the thing that happened */
   }
+}
+
+/** Whether an event is switched on at all, independent of who holds a role. */
+async function eventIsOn(companyId: string, event: string): Promise<boolean> {
+  const supabase = server(cookies());
+  const { data } = await supabase
+    .from('notification_prefs')
+    .select('email, locked')
+    .eq('event', event)
+    .maybeSingle();
+  return Boolean(data?.email || (data as any)?.locked);
 }

@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canSeeFinancials, canWrite, money } from '@/lib/session';
-import { handOver, disposeAsset, saveAssetAttribute } from '@/lib/actions';
+import { handOver, disposeAsset, saveAssetAttribute, returnAssetToStock } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,9 @@ export default async function AssetDetail({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { error?: string; handed?: string; added?: string; saved?: string };
+  searchParams: {
+    error?: string; handed?: string; added?: string; saved?: string; returned?: string;
+  };
 }) {
   const session = await getSession();
   const supabase = sb();
@@ -35,8 +37,8 @@ export default async function AssetDetail({
   const { data: asset } = await supabase
     .from('assets')
     .select(
-      `id, tag, name, serial_no, status, holder, acquired_on, meter_value, meter_unit,
-       disposed_on, disposal_reason, disposal_ref,
+      `id, tag, name, description, serial_no, status, holder, acquired_on,
+       meter_value, meter_unit, disposed_on, disposal_reason, disposal_ref,
        locations ( name ),
        models ( id, name, service_life_years, warranty_months, spares, specs,
                 brands ( name ), sub_categories ( name ) )`
@@ -63,6 +65,16 @@ export default async function AssetDetail({
 
   const a = asset as any;
   const st = STATUS[a.status] ?? STATUS.idle;
+
+  // Countable items only: the return card offers somewhere for this thing to
+  // go back to, and diesel is never that place.
+  const { data: stockRows } = await supabase
+    .from('stock_items')
+    .select('id, sku, name')
+    .eq('is_divisible', false)
+    .is('archived_at', null)
+    .order('name');
+  const stockItems = stockRows ?? [];
 
   // Financials sit in their own table behind their own policy. A manager
   // asking for them gets no row back at all — nothing to blank out here.
@@ -135,6 +147,15 @@ export default async function AssetDetail({
       {searchParams.handed && (
         <div className="notice">
           <p>Custody updated, and the change is on the audit log with your name against it.</p>
+        </div>
+      )}
+      {searchParams.returned && (
+        <div className="notice">
+          <p>
+            <b>Returned to stock.</b> The balance went up by one and this asset is retired
+            rather than deleted — what it did and what was spent on it is still the
+            company&rsquo;s record.
+          </p>
         </div>
       )}
 
@@ -262,6 +283,44 @@ export default async function AssetDetail({
               </select>
             </div>
             <button className="btn btn-p" type="submit">Record the handover</button>
+          </form>
+        </div>
+      )}
+
+      {/* The way back across the boundary. A thing that returns to the store
+          and stops being individually interesting goes back to being a
+          balance — but the row is retired, not deleted, because its history
+          belongs to the company. */}
+      {canWrite(session) && a.status !== 'retired' && a.status !== 'transit' && stockItems.length > 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">Return to stock</div>
+              <div className="card-s">
+                Back on the shelf and interchangeable again. Raises the balance by one at this
+                asset&rsquo;s location and retires the row — it is not deleted, because the
+                audit trail refers to it.
+              </div>
+            </div>
+          </div>
+          <form
+            action={returnAssetToStock}
+            style={{ padding: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}
+          >
+            <input type="hidden" name="asset" value={a.id} />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label className="lbl" htmlFor="ret-item">Which stock item</label>
+              <select className="inp" id="ret-item" name="item" required>
+                {stockItems.map((i: any) => (
+                  <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <label className="lbl" htmlFor="ret-reason">Why</label>
+              <input className="inp" id="ret-reason" name="reason" placeholder="e.g. Branch downsized" />
+            </div>
+            <button className="btn btn-g" type="submit">Return to stock</button>
           </form>
         </div>
       )}

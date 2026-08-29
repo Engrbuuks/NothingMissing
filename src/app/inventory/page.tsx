@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canSeeFinancials, canWrite, money } from '@/lib/session';
-import { issueStock, receiveStock, transferStock, deleteStockItem, archiveStockItem } from '@/lib/actions';
+import { issueStock, receiveStock, transferStock, deleteStockItem, archiveStockItem,
+         commissionStock } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,11 +32,16 @@ export default async function Inventory({
   if (fcat !== 'all') itemQ = itemQ.eq('category', fcat);
   if (q) itemQ = itemQ.or(`sku.ilike.%${q}%,name.ilike.%${q}%`);
 
-  const [{ data: items, error }, { data: balances }, { data: locs }, { data: allItems }] = await Promise.all([
+  const [{ data: items, error }, { data: balances }, { data: locs }, { data: allItems },
+         { data: models }] = await Promise.all([
     itemQ,
     supabase.from('stock_balances').select('item_id, location_id, qty'),
     supabase.from('locations').select('id, name, kind').is('archived_at', null).order('name'),
     supabase.from('stock_items').select('category').is('archived_at', null),
+    // Commissioning can attach a catalog model, which is what gives the new
+    // assets a service interval and warranty term. Without it they are on the
+    // register but never appear in maintenance.
+    supabase.from('models').select('id, name, brands ( name )').order('name'),
   ]);
 
   const list = (items ?? []) as any[];
@@ -274,6 +280,56 @@ export default async function Inventory({
                 <input className="inp" name="reason" placeholder="What it was for" />
               </div>
               <button className="btn btn-p" type="submit">Record the issue</button>
+            </form>
+          </div>
+
+          {/* The crossing between the two halves of this system. Countable
+              things become tracked things at the moment somebody signs for
+              them, and until now nothing modelled that: issuing destroyed the
+              quantity and created nothing, so the units left the ledger and
+              arrived nowhere. */}
+          <div className="card">
+            <div className="card-h bd">
+              <div>
+                <div className="card-t">Commission into assets</div>
+                <div className="card-s">
+                  Draw countable units from the shelf and put them on the register, each with
+                  its own tag. For when stock stops being interchangeable — twelve chairs a
+                  branch manager has signed for are twelve things somebody will ask after.
+                </div>
+              </div>
+            </div>
+            <form action={commissionStock} style={{ padding: 20, display: 'grid', gap: 12 }}>
+              <select className="inp" name="item" required>
+                {list.filter((i: any) => !i.is_divisible)
+                     .map((i: any) => <option key={i.id} value={i.id}>{i.sku} — {i.name}</option>)}
+              </select>
+              <select className="inp" name="location" required>
+                {(locs ?? []).map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input className="inp" name="qty" type="number" min="1" step="1"
+                       placeholder="How many" required />
+                <input className="inp" name="holder" placeholder="Assigned to" />
+              </div>
+              <input className="inp" name="name"
+                     placeholder="Asset name (defaults to the item name)" />
+              <select className="inp" name="model" defaultValue="">
+                <option value="">No catalog model</option>
+                {(models ?? []).map((m: any) => (
+                  <option key={m.id} value={m.id}>
+                    {m.brands?.name ? `${m.brands.name} ` : ''}{m.name}
+                  </option>
+                ))}
+              </select>
+              <textarea className="inp" name="serials" rows={2}
+                        placeholder="Serial numbers, one per line — optional, but all or none" />
+              <input className="inp" name="reason" placeholder="Why they are being commissioned" />
+              <button className="btn btn-p" type="submit">Commission</button>
+              <div className="hint">
+                Only countable items appear above. Diesel cannot become an asset — there is
+                no object to label, and the next forty litres are the same forty litres.
+              </div>
             </form>
           </div>
 

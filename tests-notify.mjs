@@ -21,7 +21,10 @@ const src = [];
 }})('src');
 const app = src.join('\n');
 
+// Only .sql — see the note in tests-schema.mjs. A stray directory crashes
+// this, and a .DS_Store is folded into the schema as if it were a migration.
 const sql = readdirSync('backend/supabase/migrations')
+  .filter(f=>f.endsWith('.sql')).sort()
   .map(f=>readFileSync(join('backend/supabase/migrations',f),'utf8')).join('\n');
 
 const block = sql.match(/insert into app\.notification_prefs[\s\S]*?;/);

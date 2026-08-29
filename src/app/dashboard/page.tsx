@@ -69,6 +69,24 @@ export default async function Dashboard() {
   }
   const estateValue = [...costs.values()].reduce((s, v) => s + v, 0);
 
+  // The hero figure. Purchase cost was a poor headline: it reads "Restricted"
+  // for every manager and clerk, it answers a question the register is not the
+  // authority on, and — the real objection — it does not move when the
+  // register stops being true, which is the only thing this product promises.
+  //
+  // Accounted-for does move. Computed in the database so the definition cannot
+  // drift from the one /discrepancies and /transfers work to.
+  const companyId = session?.tenant?.id ?? session?.memberships?.[0]?.company_id ?? null;
+  const { data: conf } = companyId
+    ? await supabase.rpc('register_confidence', { p_company: companyId })
+    : { data: null };
+  const c = (conf ?? {}) as {
+    live?: number; accounted?: number; in_transit?: number;
+    disputed?: number; unverified?: number; pct?: number;
+  };
+  const accountedPct = c.pct ?? 100;
+  const openQuestions = (c.in_transit ?? 0) + (c.disputed ?? 0);
+
   // --- first run -------------------------------------------------------------
   if (assets.length === 0) {
     return (
@@ -216,33 +234,37 @@ export default async function Dashboard() {
             </div>
             <h1>Good day{firstName ? `, ${firstName}` : ''}</h1>
             <p className="hero-sub">
-              {assets.filter((a) => a.status === 'repair').length} out for repair and{' '}
-              {assets.filter((a) => a.status === 'transit').length} between registers.
-              Everything else is where it should be.
+              {openQuestions === 0
+                ? `Every one of your ${c.live ?? live.length} live assets is where the register says it is.`
+                : `${openQuestions} ${openQuestions === 1 ? 'asset has' : 'assets have'} an open question against ${openQuestions === 1 ? 'it' : 'them'} — everything else is accounted for.`}
             </p>
+            {/* The figure is a percentage, not a count, because "1,847" means
+                nothing without the denominator and the whole point is the
+                proportion. The count follows in the caption. */}
             <div className="hero-fig">
-              <span className="hero-num">{showCost ? short(estateValue) : 'Restricted'}</span>
+              <span className="hero-num">{accountedPct}%</span>
             </div>
             <div className="hero-cap">
-              {showCost
-                ? `Register value across ${locCount} location${locCount === 1 ? '' : 's'}`
-                : 'Your role does not include financial visibility'}
+              Accounted for — {(c.accounted ?? 0).toLocaleString()} of{' '}
+              {(c.live ?? 0).toLocaleString()} across {locCount} location{locCount === 1 ? '' : 's'}
             </div>
-            {showCost && yKeys.length > 1 && (
+            {/* The register growing, not the money spent. It was cumulative
+                purchase cost, which drew a line under a headline that is no
+                longer about money — and it was gated by role, so the manager
+                who opens this page daily saw an empty space where a chart
+                belongs. Counting assets is something every role may see. */}
+            {yKeys.length > 1 && (
               <div
                 className="hero-spark"
                 dangerouslySetInnerHTML={{
                   __html: sparkline(
                     yKeys.map((y) => {
-                      // cumulative purchase cost by year acquired
                       let running = 0;
                       for (const a of assets) {
                         if (!a.acquired_on) continue;
-                        if (new Date(a.acquired_on).getFullYear() <= Number(y)) {
-                          running += costs.get(a.id) ?? 0;
-                        }
+                        if (new Date(a.acquired_on).getFullYear() <= Number(y)) running += 1;
                       }
-                      return running / 100;
+                      return running;
                     }),
                     460, 54, '#8B7BF5', 'hero'
                   ),
@@ -254,6 +276,14 @@ export default async function Dashboard() {
               <div className="hs"><div className="hs-v">{brands.length}</div><div className="hs-l">Brands owned</div></div>
               <div className="hs"><div className="hs-v">{locCount}</div><div className="hs-l">Live locations</div></div>
               <div className="hs"><div className="hs-v">{util}%</div><div className="hs-l">In active service</div></div>
+              {/* The honest counterweight to the headline. A register can read
+                  100% accounted for while nobody has laid eyes on any of it,
+                  and that distinction is the difference between a figure and a
+                  reassurance. */}
+              <div className="hs">
+                <div className="hs-v">{(c.unverified ?? 0).toLocaleString()}</div>
+                <div className="hs-l">Never verified</div>
+              </div>
             </div>
           </div>
           <div className="hero-r">
@@ -325,6 +355,9 @@ export default async function Dashboard() {
               <div className="ss"><div className="ss-v">{assets.length}</div><div className="ss-l">On register</div></div>
               <div className="ss"><div className="ss-v">{cats.length}</div><div className="ss-l">Categories</div></div>
               <div className="ss"><div className="ss-v">{brands.length}</div><div className="ss-l">Brands</div></div>
+              {/* Register value keeps its place, just not the headline. It is
+                  still the right number for an insurer or a board pack; it was
+                  simply never the right number to lead with. */}
               <div className="ss">
                 <div className="ss-v">{showCost ? short(estateValue) : '—'}</div>
                 <div className="ss-l">{showCost ? 'Register value' : 'Value restricted'}</div>

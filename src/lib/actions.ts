@@ -214,6 +214,64 @@ export async function issueStock(formData: FormData): Promise<void> {
   redirect(error ? `/inventory?error=${encodeURIComponent(error.message)}` : '/inventory?done=issued');
 }
 
+/**
+ * Stock becoming assets.
+ *
+ * The transition a register needs and did not have: fifty chairs sit in the
+ * store as a countable balance, twelve are issued to a branch where somebody
+ * signs for them, and from that moment somebody will ask where a specific one
+ * is. Issuing alone destroyed the quantity and created nothing, so the twelve
+ * left the ledger and arrived nowhere.
+ *
+ * All the rules — the balance check, the refusal to tag a divisible item, the
+ * serial count — live in app.commission_stock(), which does the deduction and
+ * the creation in one transaction.
+ */
+export async function commissionStock(formData: FormData): Promise<void> {
+  const raw = String(formData.get('serials') ?? '').trim();
+  // One per line or comma-separated, because people paste from a delivery note.
+  const serials = raw
+    ? raw.split(/[\n,]/).map((x) => x.trim()).filter(Boolean)
+    : null;
+
+  const { data, error } = await sb().rpc('commission_stock', {
+    p_item: String(formData.get('item')),
+    p_location: String(formData.get('location')),
+    p_qty: Number(formData.get('qty')),
+    p_name: (formData.get('name') as string) || null,
+    p_model: (formData.get('model') as string) || null,
+    p_holder: (formData.get('holder') as string) || null,
+    p_serials: serials,
+    p_note: (formData.get('reason') as string) || null,
+  });
+
+  revalidatePath('/inventory');
+  revalidatePath('/assets');
+  if (error) redirect(`/inventory?error=${encodeURIComponent(error.message)}`);
+  redirect(`/assets?added=${(data as any)?.created ?? 1}`);
+}
+
+/**
+ * An asset going back to the store, becoming interchangeable again.
+ *
+ * The asset is retired rather than deleted: who held it and what was spent on
+ * it is the company's record, and does not stop being true because the thing
+ * went back on a shelf.
+ */
+export async function returnAssetToStock(formData: FormData): Promise<void> {
+  const asset = String(formData.get('asset') ?? '');
+  const { error } = await sb().rpc('return_to_stock', {
+    p_asset: asset,
+    p_item: String(formData.get('item')),
+    p_reason: (formData.get('reason') as string) || null,
+  });
+  revalidatePath('/inventory');
+  revalidatePath('/assets');
+  revalidatePath(`/assets/${asset}`);
+  if (error) redirect(`/assets/${asset}?error=${encodeURIComponent(error.message)}`);
+  redirect(`/assets/${asset}?returned=1`);
+}
+
 export async function transferStock(formData: FormData): Promise<void> {
   const { error } = await sb().rpc('transfer_stock', {
     p_item: String(formData.get('item')),
@@ -327,11 +385,19 @@ export async function resolveDiscrepancy(formData: FormData): Promise<void> {
 
 export async function decideRequest(formData: FormData): Promise<void> {
   const id = String(formData.get('id'));
-  const { error } = await sb().rpc('decide_request', {
+  const supabase = sb();
+  const { error } = await supabase.rpc('decide_request', {
     p_request: id,
     p_approve: String(formData.get('decision')) === 'approve',
     p_note: (formData.get('note') as string) || null,
   });
+
+  // Whichever way it went, somebody is waiting to hear. If a step was
+  // approved and the chain continues, request_notice() reports the NEXT step
+  // as pending, so this asks the next approver rather than announcing an
+  // outcome that has not happened yet.
+  if (!error) await tellApprovers(supabase, id, 'request.decided');
+
   revalidatePath('/requests');
   if (error) redirect('/requests?error=' + encodeURIComponent(error.message));
 }
@@ -468,7 +534,7 @@ export async function raiseRequest(formData: FormData): Promise<void> {
 
   // The chain is chosen by app.match_policy() from the amount and item count.
   // Nothing here decides who approves; that is a row in approval_policies.
-  const { error } = await supabase.rpc('raise_request', {
+  const { data: raised, error } = await supabase.rpc('raise_request', {
     p_company: loc.company_id,
     p_kind: kind,
     p_title: String(formData.get('title') ?? ''),
@@ -479,9 +545,78 @@ export async function raiseRequest(formData: FormData): Promise<void> {
     p_items: Number(formData.get('items') ?? 1) || 1,
   });
 
+  // Tell whoever has to sign it. An approval chain nobody is told about is a
+  // queue people discover by logging in and looking, which is how a request
+  // for a broken generator waits three days on somebody's screen.
+  if (!error && raised) await tellApprovers(supabase, String(raised), 'request.raised');
+
   revalidatePath('/requests');
   if (error) redirect('/requests/new?error=' + encodeURIComponent(error.message));
   redirect('/requests?raised=1');
+}
+
+/**
+ * Email the people who can act on a request, and the person who raised it.
+ *
+ * The audience comes from app.request_notice() rather than from a role list
+ * written here: `decide_request()` decides which role a step needs and
+ * seniority satisfies a junior step, so working the audience out separately
+ * would be a second opinion that could quietly disagree with the first.
+ */
+async function tellApprovers(
+  supabase: ReturnType<typeof sb>,
+  requestId: string,
+  event: 'request.raised' | 'request.decided',
+): Promise<void> {
+  try {
+    const { data: n } = await supabase.rpc('request_notice', { p_request: requestId });
+    if (!n) return;
+
+    const notice = n as Record<string, any>;
+    const money = notice.amount_minor
+      ? `\nAmount: ₦${(Number(notice.amount_minor) / 100).toLocaleString('en-NG')}`
+      : '';
+    const where = notice.location ? `\nLocation: ${notice.location}` : '';
+    const about = notice.asset ? `\nAsset: ${notice.asset}` : '';
+    const detail = notice.detail ? `\n\n${notice.detail}` : '';
+    const line = `${notice.reference} — ${notice.title}`;
+
+    if (notice.status === 'pending') {
+      const roles: string[] = Array.isArray(notice.notify_roles) ? notice.notify_roles : [];
+      // A chain still running: ask the step that is waiting. The subject says
+      // what is wanted, because an approver scanning a phone decides from the
+      // subject whether to open it at all.
+      await announce({
+        companyId: notice.company_id,
+        event,
+        roles,
+        subject: `Approval needed: ${line}`,
+        body:
+          `${notice.raised_by ?? 'Somebody'} raised a ${notice.kind} request that needs your approval.\n\n` +
+          `${line}${money}${where}${about}${detail}\n\n` +
+          `This is step ${notice.step} of ${notice.of}, waiting on a ${notice.awaiting_role}.\n\n` +
+          `Open Requests in Nothing Missing to approve or decline it.`,
+      });
+      return;
+    }
+
+    // Finished, one way or the other. Only the raiser needs this — the
+    // approvers were there when it happened.
+    const outcome = notice.status === 'approved' ? 'approved' : String(notice.status);
+    await announce({
+      companyId: notice.company_id,
+      event: 'request.decided',
+      roles: [],
+      also: [notice.raised_by_email],
+      subject: `Your request was ${outcome}: ${line}`,
+      body:
+        `The ${notice.kind} request you raised has been ${outcome}.\n\n` +
+        `${line}${money}${where}${about}\n\n` +
+        `Open Requests in Nothing Missing to see who decided and any note they left.`,
+    });
+  } catch {
+    /* a request that was raised must not appear to fail because email did */
+  }
 }
 
 export async function updateCompany(formData: FormData): Promise<void> {
@@ -539,31 +674,109 @@ export async function sweepLocation(id: string): Promise<void> {
 
 export async function createAsset(formData: FormData): Promise<void> {
   const supabase = sb();
-  const location = String(formData.get('location') ?? '');
-  const { data: loc } = await supabase
-    .from('locations').select('company_id').eq('id', location).maybeSingle();
-  if (!loc) redirect('/assets/new?error=' + encodeURIComponent('That location could not be read.'));
+
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) {
+    redirect('/assets/new?error=' + encodeURIComponent('An asset needs a name.'));
+  }
+
+  // Location is optional at the form. The database requires one for anything
+  // not in transit, so an asset entered without one lands in the virtual
+  // warehouse — which is exactly what that location is for. Refusing the entry
+  // instead means a register nobody finishes building, and an asset recorded
+  // in the wrong place is far easier to correct than one never recorded.
+  let location = String(formData.get('location') ?? '').trim();
+  let companyId: string | null = null;
+
+  if (location) {
+    const { data: loc } = await supabase
+      .from('locations').select('company_id').eq('id', location).maybeSingle();
+    if (!loc) {
+      redirect('/assets/new?error=' + encodeURIComponent('That location could not be read.'));
+    }
+    companyId = loc.company_id;
+  } else {
+    const { data: warehouse } = await supabase
+      .from('locations')
+      .select('id, company_id')
+      .eq('kind', 'virtual')
+      .is('archived_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (!warehouse) {
+      redirect('/assets/new?error=' + encodeURIComponent(
+        'Choose a location — this company has no virtual warehouse to fall back on.'));
+    }
+    location = warehouse.id;
+    companyId = warehouse.company_id;
+  }
 
   const cost = String(formData.get('cost') ?? '').replace(/[^\d]/g, '');
   const model = String(formData.get('model') ?? '');
 
-  const { data: asset, error } = await supabase
+  // Quantity creates that many assets, each individually tagged. It is not a
+  // column: an asset row holds one location, one serial and one history, so a
+  // row reading "10 chairs" stops being true the moment three of them move.
+  // Ten rows can each move, be repaired and be disposed of separately, which
+  // is the entire reason this is a register rather than a stock list.
+  const quantity = Math.floor(Number(formData.get('quantity') ?? 1));
+  if (!Number.isFinite(quantity) || quantity < 1) {
+    redirect('/assets/new?error=' + encodeURIComponent('Quantity must be at least 1.'));
+  }
+  // A ceiling, because 500 rows typed into a form is a spreadsheet, and the
+  // import handles those better — with a dry run, which this has no way to do.
+  if (quantity > 100) {
+    redirect('/assets/new?error=' + encodeURIComponent(
+      'That is more than 100 — use Import for a batch that size, so you can preview it first.'));
+  }
+
+  const serial = String(formData.get('serial') ?? '').trim();
+  const tag = String(formData.get('tag') ?? '').trim();
+
+  // One serial cannot describe ten machines, and one tag cannot label them.
+  // The unique constraint would refuse the second row anyway; saying so here
+  // means the person is told which field to fix rather than reading a
+  // constraint name.
+  if (quantity > 1 && serial) {
+    redirect('/assets/new?error=' + encodeURIComponent(
+      'A serial number identifies one machine. Add these without serials and fill each in later, or enter them one at a time.'));
+  }
+  if (quantity > 1 && tag) {
+    redirect('/assets/new?error=' + encodeURIComponent(
+      'A tag labels one asset. Leave the tag blank and each of the ' + quantity + ' will be issued its own.'));
+  }
+
+  // Tag and serial go in as typed. A blank tag is filled by the database
+  // trigger from app.next_asset_tag(), and a blank serial becomes null there
+  // too — doing either here would mean the form and the spreadsheet import
+  // could drift apart, which is exactly how the two paths disagreed before.
+  const common = {
+    company_id: companyId,
+    name,
+    description: String(formData.get('description') ?? '').trim() || null,
+    model_id: model || null,
+    location_id: location,
+    status: 'active',
+    holder: String(formData.get('holder') ?? '').trim() || null,
+    acquired_on: String(formData.get('acquired') ?? '') || null,
+    meter_value: Number(formData.get('meter') ?? 0) || 0,
+    meter_unit: String(formData.get('meter_unit') ?? '') || null,
+  };
+
+  // One statement, so the batch is all or nothing. Five of ten landing leaves
+  // somebody counting rows to work out which five to enter again.
+  const { data: created, error } = await supabase
     .from('assets')
-    .insert({
-      company_id: loc.company_id,
-      tag: String(formData.get('tag') ?? '').trim(),
-      name: String(formData.get('name') ?? '').trim(),
-      serial_no: String(formData.get('serial') ?? '').trim() || null,
-      model_id: model || null,
-      location_id: location,
-      status: 'active',
-      holder: String(formData.get('holder') ?? '').trim() || null,
-      acquired_on: String(formData.get('acquired') ?? '') || null,
-      meter_value: Number(formData.get('meter') ?? 0) || 0,
-      meter_unit: String(formData.get('meter_unit') ?? '') || null,
-    })
-    .select('id')
-    .single();
+    .insert(
+      Array.from({ length: quantity }, () => ({
+        ...common,
+        tag,
+        serial_no: serial || null,
+      })),
+    )
+    .select('id');
+
+  const asset = created?.[0];
 
   if (error || !asset) {
     redirect('/assets/new?error=' + encodeURIComponent(error?.message ?? 'Could not add the asset.'));
@@ -571,17 +784,28 @@ export async function createAsset(formData: FormData): Promise<void> {
 
   // Cost goes in its own table, so an asset added by someone who cannot see
   // costs simply has no financial row rather than a zero.
+  //
+  // The figure is the cost of ONE, written against each unit — not the invoice
+  // total split between them. Ten chairs on a ₦450,000 invoice are ₦45,000
+  // each, and depreciation, disposal and book value are all per asset, so a
+  // total stored ten times would overstate the estate tenfold.
   if (cost) {
-    await supabase.from('asset_financials').insert({
-      asset_id: asset.id,
-      company_id: loc.company_id,
-      purchase_cost_minor: Number(cost) * 100,
-      invoice_ref: String(formData.get('invoice') ?? '') || null,
-    });
+    await supabase.from('asset_financials').insert(
+      (created ?? []).map((a) => ({
+        asset_id: a.id,
+        company_id: companyId,
+        purchase_cost_minor: Number(cost) * 100,
+        invoice_ref: String(formData.get('invoice') ?? '') || null,
+      })),
+    );
   }
 
   revalidatePath('/assets');
-  redirect(`/assets/${asset.id}?added=1`);
+
+  // One asset opens on its own page, because there is something to look at.
+  // A batch goes to the register, where all of them are visible at once.
+  if (quantity === 1) redirect(`/assets/${asset.id}?added=1`);
+  redirect(`/assets?added=${quantity}`);
 }
 
 export async function createCategory(formData: FormData): Promise<void> {

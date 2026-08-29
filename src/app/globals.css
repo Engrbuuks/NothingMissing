@@ -266,6 +266,10 @@ tbody tr:last-child td{border-bottom:none}
 .field{padding:0 20px 18px}
 .lbl{font-size:12.5px;font-weight:600;margin-bottom:7px;display:block}
 .hint{font-size:12px;color:var(--text-3);margin-top:6px;line-height:1.5}
+/* Marks the one field a form insists on. Marking the required field is
+   clearer than marking every optional one, because on these forms almost
+   everything is optional and a wall of "optional" reads as noise. */
+.req{font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--brand);background:var(--brand-soft);border-radius:20px;padding:2px 7px;margin-left:7px;vertical-align:1px}
 .inp{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:13.5px;background:var(--surface)}
 .inp:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .logo-drop{display:flex;align-items:center;gap:15px;padding:15px;border:1px dashed var(--line);border-radius:var(--r);background:#FBFBFE}

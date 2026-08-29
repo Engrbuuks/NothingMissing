@@ -61,7 +61,7 @@ then open `http://eppme.localhost:3000`.
     src/lib/actions.ts       server actions — each calls a database function
     src/app/diagnostics      checks the wiring and reports what this session reaches
 
-    backend/                 10 Postgres migrations, 271 tests, bootstrap.sql
+    backend/                 34 Postgres migrations, the test suite, bootstrap.sql
     public/prototype/        the original clickable prototype, kept as the spec
 
 The prototype stays reachable at `/prototype/app.html`. It is a specification,
@@ -84,14 +84,22 @@ hide UI a person cannot use; they enforce nothing.
     cd backend
     bash scripts/test.sh
 
-Drops the database, replays all ten migrations from empty, seeds two unrelated
-companies and runs 271 assertions. See `backend/README.md` for the design
+Drops the database, replays every migration from empty, seeds two unrelated
+companies and runs the full assertion suite. See `backend/README.md` for the design
 decisions — membership-based tenancy, USING paired with WITH CHECK on every
 write policy, purchase cost behind its own table, an append-only audit log, and
 the atomic transfer acceptance.
 
-To set up a real project: run migrations `0001` through `0011` in order in the
-Supabase SQL editor, then `bootstrap.sql` once. Do **not** run
+To set up a real project: run **every** migration in `backend/supabase/migrations`
+in numerical order — `0001` through `0034` — in the Supabase SQL editor, then
+`bootstrap.sql` once.
+
+Run them **all**. An earlier version of this file said `0001` through `0011`,
+which was true when it was written and quietly wrong from `0012` onwards: a
+database stopped at `0011` has no `raise_purchase_order()`, so the purchase
+order page fails with a missing function and looks like a broken feature
+rather than an unapplied migration. When a page reports that a function does
+not exist, the migration behind it has not been run. Do **not** run
 `supabase/seed.sql` — those are test fixtures for two fictional companies.
 
 ## Movement
@@ -954,7 +962,7 @@ no explanation — which looks broken. The two that a real user hits are fixed: 
 new company's Locations page now explains the virtual warehouse and offers the
 branch import, and the import preview handles a paste it could not read.
 
-## What the new checks found (0028)
+## What the new checks found (0034)
 
 Rather than guessing at what else was broken, I wrote checks for the failure
 modes I had already hit twice, and ran them.
@@ -977,6 +985,13 @@ it. The marketing site sells "shrinkage you can find" and the product had
 nowhere to find it. `fuel_fleet()` and `/fuel` fix that: verified at 40 hours
 run, 1,800 litres issued against 740 the engine could burn — 1,060 litres
 flagged.
+
+`fuel_fleet()` shipped as a *second* file numbered 0028, next to
+`0028_sanity_constraints.sql` — the identical fault that was removed at 0019,
+reintroduced ten migrations later. It is now `0034_fuel_fleet.sql`. Nothing
+about the function changed, and a database that already applied it as 0028
+needs no action: the body is `create or replace`, so re-running it rewrites
+the function to the same definition.
 
 **Waybills were never created.** The page reads `waybill_documents`, the
 snapshot function existed, and nothing wrote a row — so "Print the waybill"
@@ -1253,7 +1268,30 @@ by performing it.
 
 Every screen is built and reading live data: assets, catalog, inventory,
 transfers, requests, field inbox, people and links, locations, audit log,
-diagnostics.
+diagnostics, import, reports, maintenance, purchase orders, suppliers,
+discrepancies, fuel, approvals, billing and settings. Disposal and handover
+live on the asset page rather than a screen of their own, because both are
+things you do *to a particular asset* and you get there by looking at it.
 
-Not built: bulk import, reports, tags and scanning, disposal and maintenance
-screens. All exist in the database already — they need pages, not migrations.
+This paragraph previously said bulk import, reports, disposal and maintenance
+were not built, long after they were. A status section that is wrong in this
+direction is not harmless: it is read by whoever is deciding what to work on
+next.
+
+**Not built, and honestly named:**
+
+- **Tags and scanning.** No barcode or QR generation, and nothing reads one.
+  The register is typed into, which is the slowest part of using it.
+- **Ten of the twelve notifications.** Only `transfer.dispatched` and
+  `discrepancy.opened` send. `tests-notify.mjs` names the other ten on every
+  run so they stay visible rather than becoming a claim nobody checks.
+
+**Built but waiting on an account, not on code:** Paystack needs a live
+business account before anything can be charged; SMS and WhatsApp queue
+visibly until Termii credentials exist; errors log as structured JSON until
+`SENTRY_DSN` is set. Each degrades to "nothing sent" rather than to a crash.
+
+**The gap that matters more than any of the above:** nobody has run a real
+job on this. Every flow works because both halves were designed together,
+which is exactly the condition under which real use finds things design
+cannot.

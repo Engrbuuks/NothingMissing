@@ -15,7 +15,12 @@ const files = [];
   }
 })('src');
 
+// Only .sql. Reading every entry means a stray directory crashes this with an
+// EISDIR stack trace that names neither the folder nor the reason, and a
+// .DS_Store is read as text and quietly folded into the schema this checks
+// against — a check that silently widens what it accepts is worse than none.
 const sql = readdirSync('backend/supabase/migrations')
+  .filter(f => f.endsWith('.sql')).sort()
   .map(f => readFileSync(join('backend/supabase/migrations', f), 'utf8')).join('\n');
 
 const fns = new Set([...sql.matchAll(/create or replace function app\.(\w+)/g)].map(m => m[1]));
