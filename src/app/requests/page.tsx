@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, money } from '@/lib/session';
-import { decideRequest } from '@/lib/actions';
+import { decideRequest, resendApprovalLink } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,14 +9,16 @@ const STATE: Record<string, string> = {
   rejected: 'p-bad', cancelled: 'p-mute', fulfilled: 'p-ok',
 };
 
-export default async function Requests({ searchParams }: { searchParams: { error?: string; raised?: string; decided?: string } }) {
+export default async function Requests({ searchParams }: { searchParams: { error?: string; raised?: string; decided?: string; resent?: string } }) {
   const supabase = sb();
 
   const { data, error } = await supabase
     .from('requests')
     .select(`id, reference, kind, status, title, detail, amount_minor, item_count,
-             current_step, raised_at, locations ( name ),
-             request_steps ( step_no, required_role, status, decided_at )`)
+             current_step, raised_at, external_state, locations ( name ),
+             request_steps ( step_no, required_role, status, decided_at ),
+             approval_tasks ( id, decision, decided_at,
+                              external_approvers ( name, email ) )`)
     .order('raised_at', { ascending: false })
     .limit(100);
 
@@ -35,6 +37,11 @@ export default async function Requests({ searchParams }: { searchParams: { error
         </div>
       )}
       {searchParams.decided && <div className="notice"><p>Recorded, with your name against it.</p></div>}
+      {searchParams.resent && (
+        <div className="notice">
+          <p>A new link has been sent. Any earlier link for that approver has stopped working.</p>
+        </div>
+      )}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
 
       <div className="notice">
@@ -88,7 +95,22 @@ export default async function Requests({ searchParams }: { searchParams: { error
                           </span>
                         ))}
                       </td>
-                      <td><span className={`pill ${STATE[r.status]}`}><span className="pd" />{r.status}</span></td>
+                      <td>
+                        <span className={`pill ${STATE[r.status]}`}><span className="pd" />{r.status}</span>
+                        {/* The email approvers are a second gate running beside
+                            the role chain, so the status pill alone would say
+                            "pending" with no clue what it is pending on. */}
+                        {r.external_state === 'pending' && (
+                          <div className="amake" style={{ marginTop: 4 }}>
+                            waiting on {(r.approval_tasks ?? []).filter((t: any) => !t.decision).length} by email
+                          </div>
+                        )}
+                        {(r.approval_tasks ?? []).filter((t: any) => t.decision).map((t: any) => (
+                          <div key={t.id} className="amake" style={{ marginTop: 3 }}>
+                            {t.external_approvers?.name} {t.decision} by email
+                          </div>
+                        ))}
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         {r.status === 'pending' && (
                           <form action={decideRequest} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -99,6 +121,20 @@ export default async function Requests({ searchParams }: { searchParams: { error
                             <button className="btn btn-g" type="submit" name="decision" value="reject">Reject</button>
                           </form>
                         )}
+                        {/* A link that never arrived is the ordinary failure
+                            here — a spam filter, a typo in the address. The
+                            token cannot be read back, so the only recovery is
+                            to issue a new one. */}
+                        {r.status === 'pending' &&
+                          (r.approval_tasks ?? []).filter((t: any) => !t.decision).map((t: any) => (
+                            <form key={t.id} action={resendApprovalLink.bind(null, t.id)}
+                                  style={{ marginTop: 6 }}>
+                              <button className="btn btn-g" type="submit"
+                                      style={{ padding: '5px 9px', fontSize: 12 }}>
+                                Resend to {t.external_approvers?.name ?? 'approver'}
+                              </button>
+                            </form>
+                          ))}
                       </td>
                     </tr>
                   );

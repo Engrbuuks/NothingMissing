@@ -18,6 +18,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-time-placeholder
           NEXT_PUBLIC_ROOT_DOMAIN: nothingmissing.ng
 
+      # The middleware and app.reserved_slugs are the same list in two
+      # languages, and they drift silently. middleware.ts claimed this check
+      # existed long before it did.
+      - name: reserved slugs agree on both sides
+        run: node tests-reserved-parity.mjs
+
       # Two files sharing a migration number apply in whatever order the
       # shell globs them, and by hand in the SQL editor there is no order at
       # all. This shipped at 0019 and again at 0028.

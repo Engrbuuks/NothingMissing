@@ -1,7 +1,8 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canWrite, canSeeFinancials, money } from '@/lib/session';
 import { createCategory, createSubCategory, createBrand, createModel,
-         deleteCategory, deleteSubCategory, deleteBrand, deleteModel } from '@/lib/actions';
+         deleteCategory, deleteSubCategory, deleteBrand, deleteModel,
+         renameCategory, renameSubCategory, renameBrand } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,12 @@ const CAT_COLOUR = ['#5B4BE8', '#E39A11', '#0FA45E', '#E14B42', '#0EA5B7', '#2E7
  */
 export default async function Catalog({
   searchParams,
-}: { searchParams: { q?: string; cat?: string; error?: string; added?: string; deleted?: string } }) {
+}: {
+  searchParams: {
+    q?: string; cat?: string; error?: string; added?: string; deleted?: string;
+    renamed?: string;
+  };
+}) {
   const session = await getSession();
   const supabase = sb();
   const q = (searchParams.q ?? '').trim();
@@ -109,6 +115,15 @@ export default async function Catalog({
 
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Added to the catalog.</p></div>}
+      {searchParams.renamed && (
+        <div className="notice">
+          <p>
+            <b>Renamed to &ldquo;{searchParams.renamed}&rdquo;.</b> Everything pointing at it
+            follows, because assets and models reference it by id rather than by name. Audit
+            rows already written keep the old name — they record what it was called at the time.
+          </p>
+        </div>
+      )}
       {searchParams.deleted && <div className="notice"><p>Removed. Nothing was using it.</p></div>}
 
       <form className="toolbar" method="get" action="/catalog">
@@ -233,7 +248,19 @@ export default async function Catalog({
               return (
                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
                   <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT_COLOUR[i % CAT_COLOUR.length] }} />
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{c.name}</span>
+                  {canWrite(session) ? (
+                    /* Editable in place. A rename is not a form somebody goes
+                       looking for — it is a correction made at the moment the
+                       mistake is noticed, which is while reading the list. */
+                    <form action={renameCategory.bind(null, c.id)}
+                          style={{ flex: 1, display: 'flex', gap: 6 }}>
+                      <input className="inp inp-inline" name="name" defaultValue={c.name}
+                             aria-label={`Rename ${c.name}`} required />
+                      <button className="btn btn-g btn-xs" type="submit">Save</button>
+                    </form>
+                  ) : (
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{c.name}</span>
+                  )}
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} type{n === 1 ? '' : 's'}</span>
                   {canWrite(session) && (
                     <form action={deleteCategory.bind(null, c.id)}>
@@ -262,7 +289,16 @@ export default async function Catalog({
               const cat = categories.find((c) => c.id === s.category_id);
               return (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{s.name}</span>
+                  {canWrite(session) ? (
+                    <form action={renameSubCategory.bind(null, s.id)}
+                          style={{ flex: 1, display: 'flex', gap: 6 }}>
+                      <input className="inp inp-inline" name="name" defaultValue={s.name}
+                             aria-label={`Rename ${s.name}`} required />
+                      <button className="btn btn-g btn-xs" type="submit">Save</button>
+                    </form>
+                  ) : (
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{s.name}</span>
+                  )}
                   <span className="pill p-mute">{cat?.name ?? '—'}</span>
                   {canWrite(session) && (
                     <form action={deleteSubCategory.bind(null, s.id)}>
@@ -299,7 +335,16 @@ export default async function Catalog({
                   <span className="br-i" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>
                     {b.name.slice(0, 2).toUpperCase()}
                   </span>
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{b.name}</span>
+                  {canWrite(session) ? (
+                    <form action={renameBrand.bind(null, b.id)}
+                          style={{ flex: 1, display: 'flex', gap: 6 }}>
+                      <input className="inp inp-inline" name="name" defaultValue={b.name}
+                             aria-label={`Rename ${b.name}`} required />
+                      <button className="btn btn-g btn-xs" type="submit">Save</button>
+                    </form>
+                  ) : (
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{b.name}</span>
+                  )}
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} model{n === 1 ? '' : 's'}</span>
                   {canWrite(session) && (
                     <form action={deleteBrand.bind(null, b.id)}>

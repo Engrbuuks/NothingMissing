@@ -1,6 +1,6 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, canWrite, canSeeFinancials, money } from '@/lib/session';
-import { saveModelSpec } from '@/lib/actions';
+import { saveModelSpec, renameModel } from '@/lib/actions';
 import { AttrField } from '@/components/AttrField';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +51,28 @@ export default async function ModelDetail({
     >
       {searchParams.saved && <div className="notice"><p>Specification saved.</p></div>}
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
+
+      {canWrite(session) && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="card-h bd">
+            <div>
+              <div className="card-t">Model name</div>
+              <div className="card-s">
+                Correcting it renames it everywhere — every unit points at this row by id, so
+                nothing is re-linked and nothing breaks
+              </div>
+            </div>
+          </div>
+          <form action={renameModel.bind(null, m.id)}
+                style={{ padding: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <label className="lbl" htmlFor="model-name">Name</label>
+              <input className="inp" id="model-name" name="name" defaultValue={m.name} required />
+            </div>
+            <button className="btn btn-g" type="submit">Save the name</button>
+          </form>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
         <a className="btn btn-g" href="/catalog">Back to the catalog</a>

@@ -2,7 +2,7 @@
 
 import { parseSheet } from './sheet';
 import { reportError } from './report-error';
-import { announce } from './notify';
+import { announce, notify } from './notify';
 
 /**
  * Server actions for movement.
@@ -548,7 +548,11 @@ export async function raiseRequest(formData: FormData): Promise<void> {
   // Tell whoever has to sign it. An approval chain nobody is told about is a
   // queue people discover by logging in and looking, which is how a request
   // for a broken generator waits three days on somebody's screen.
-  if (!error && raised) await tellApprovers(supabase, String(raised), 'request.raised');
+  if (!error && raised) {
+    await tellApprovers(supabase, String(raised), 'request.raised');
+    // Email approvers, who have no account and so appear on no role list.
+    await sendApprovalLinks(supabase, String(raised));
+  }
 
   revalidatePath('/requests');
   if (error) redirect('/requests/new?error=' + encodeURIComponent(error.message));
@@ -563,6 +567,61 @@ export async function raiseRequest(formData: FormData): Promise<void> {
  * seniority satisfies a junior step, so working the audience out separately
  * would be a second opinion that could quietly disagree with the first.
  */
+/**
+ * Send the email approvers their links.
+ *
+ * The tokens come back exactly once from app.claim_approval_tokens() — only
+ * hashes are stored — so anything that fails here is recovered by reissuing
+ * from the request page, not by reading the token again.
+ */
+async function sendApprovalLinks(
+  supabase: ReturnType<typeof sb>,
+  requestId: string,
+): Promise<void> {
+  try {
+    const { data: tasks } = await supabase.rpc('claim_approval_tokens', {
+      p_request: requestId,
+    });
+    const list = (tasks ?? []) as { name: string; email: string; token: string }[];
+    if (!list.length) return;
+
+    const { data: n } = await supabase.rpc('request_notice', { p_request: requestId });
+    const notice = (n ?? {}) as Record<string, any>;
+    const money = notice.amount_minor
+      ? `\nAmount: ₦${(Number(notice.amount_minor) / 100).toLocaleString('en-NG')}`
+      : '';
+    const where = notice.location ? `\nLocation: ${notice.location}` : '';
+
+    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
+
+    for (const task of list) {
+      // The apex, not the tenant subdomain. An approver has no account and no
+      // business being sent to a company's application host, and the apex is
+      // where /a/<token> is routed from.
+      const link = `https://${root}/a/${task.token}`;
+
+      await notify({
+        companyId: String(notice.company_id ?? ''),
+        event: 'request.raised',
+        channel: 'email',
+        recipient: task.email,
+        subject: `Approval needed: ${notice.reference} — ${notice.title}`,
+        body:
+          `${task.name},\n\n` +
+          `${notice.raised_by ?? 'Somebody'} has raised a ${notice.kind} request that needs ` +
+          `your approval.\n\n` +
+          `${notice.reference} — ${notice.title}${money}${where}\n` +
+          (notice.detail ? `\n${notice.detail}\n` : '') +
+          `\nOpen this link to see it and decide:\n${link}\n\n` +
+          `Opening the link does not approve anything — it shows you the request and you ` +
+          `press Approve or Decline there. The link works once and expires in 30 days.`,
+      });
+    }
+  } catch {
+    /* a raised request must not appear to fail because email did */
+  }
+}
+
 async function tellApprovers(
   supabase: ReturnType<typeof sb>,
   requestId: string,
@@ -621,10 +680,31 @@ async function tellApprovers(
 
 export async function updateCompany(formData: FormData): Promise<void> {
   const id = String(formData.get('id') ?? '');
-  const { error } = await sb()
+  const supabase = sb();
+
+  // The NAME goes through app.rename_company(), not this update. That function
+  // restricts the change to an owner or admin, refuses a one-character name,
+  // and writes an audit row recording what it used to be called. Writing the
+  // column directly here skipped all three — so a company could be renamed
+  // with nothing in the log saying it had been, which for the name printed on
+  // every waybill is exactly the change you would want to be able to trace.
+  //
+  // Same lesson as the brand colour: two forms owning one field means one of
+  // them silently wins.
+  const name = String(formData.get('name') ?? '').trim();
+  if (name) {
+    const { error: nameError } = await supabase.rpc('rename_company', {
+      p_company: id,
+      p_name: name,
+    });
+    if (nameError) {
+      redirect('/settings?error=' + encodeURIComponent(nameError.message));
+    }
+  }
+
+  const { error } = await supabase
     .from('companies')
     .update({
-      name: String(formData.get('name') ?? ''),
       registration_no: String(formData.get('rc') ?? '') || null,
       address: String(formData.get('address') ?? '') || null,
       phone: String(formData.get('phone') ?? '') || null,
@@ -636,6 +716,8 @@ export async function updateCompany(formData: FormData): Promise<void> {
     .eq('id', id);
 
   revalidatePath('/settings');
+  // The name is on every page's chrome, so the whole layout re-renders.
+  revalidatePath('/', 'layout');
   if (error) redirect('/settings?error=' + encodeURIComponent(error.message));
   redirect('/settings?saved=1');
 }
@@ -832,6 +914,151 @@ export async function classifyAsset(formData: FormData): Promise<void> {
   revalidatePath('/assets');
   if (error) redirect(`/assets/${asset}?error=${encodeURIComponent(error.message)}`);
   redirect(`/assets/${asset}?saved=1`);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Renaming catalog entries.
+ *
+ * Every level could be created and deleted and none could be corrected, so a
+ * typo was permanent unless the entry happened to be unused — and a category
+ * in use cannot be deleted, which is exactly the one you notice the typo on,
+ * because you noticed it while looking at the assets under it.
+ *
+ * A rename is safe in a way a delete is not. Everything points at these rows
+ * by id, so correcting the text changes what is displayed and breaks no
+ * reference: assets keep their category, models keep their type, and the
+ * audit rows already written keep the name they were written with, which is
+ * correct — the log records what a thing was called at the time.
+ * -------------------------------------------------------------------------- */
+
+/** Shared by all four: same shape, same failure modes, one place to fix them. */
+async function renameCatalogRow(
+  table: 'categories' | 'sub_categories' | 'brands' | 'models',
+  id: string,
+  raw: string,
+): Promise<never> {
+  const name = raw.trim();
+
+  if (!id) redirect('/catalog?error=' + encodeURIComponent('Nothing to rename.'));
+  if (!name) {
+    redirect('/catalog?error=' + encodeURIComponent('A name cannot be blank.'));
+  }
+
+  const { error } = await sb().from(table).update({ name }).eq('id', id);
+
+  revalidatePath('/catalog');
+  // Everything downstream displays this name, so it all has to re-render.
+  revalidatePath('/assets');
+  revalidatePath('/dashboard');
+  revalidatePath('/inventory');
+
+  if (error) {
+    // The unique constraint is the likely failure, and its raw message names
+    // an index rather than the problem.
+    const duplicate = error.code === '23505' || /duplicate|unique/i.test(error.message);
+    redirect('/catalog?error=' + encodeURIComponent(
+      duplicate
+        ? `Another entry is already called "${name}". Names have to be distinct so a list can be read.`
+        : error.message,
+    ));
+  }
+  redirect('/catalog?renamed=' + encodeURIComponent(name));
+}
+
+export async function renameCategory(id: string, formData: FormData): Promise<void> {
+  await renameCatalogRow('categories', id, String(formData.get('name') ?? ''));
+}
+
+export async function renameSubCategory(id: string, formData: FormData): Promise<void> {
+  await renameCatalogRow('sub_categories', id, String(formData.get('name') ?? ''));
+}
+
+export async function renameBrand(id: string, formData: FormData): Promise<void> {
+  await renameCatalogRow('brands', id, String(formData.get('name') ?? ''));
+}
+
+export async function renameModel(id: string, formData: FormData): Promise<void> {
+  await renameCatalogRow('models', id, String(formData.get('name') ?? ''));
+}
+
+/* -------------------------------------------------------------------------- *
+ * Email approvers — people who sign things off without holding an account.
+ * -------------------------------------------------------------------------- */
+
+export async function saveExternalApprover(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/approvals?error=' + encodeURIComponent('No company in scope.'));
+
+  // The checkbox matrix. getAll, because an unticked box sends nothing at all
+  // and the database replaces the whole set — merging would make it impossible
+  // to take somebody off a process.
+  const types = formData.getAll('types').map(String).filter(Boolean);
+
+  const { error } = await supabase.rpc('save_external_approver', {
+    p_company: co.id,
+    p_name: String(formData.get('name') ?? ''),
+    p_email: String(formData.get('email') ?? ''),
+    p_types: types,
+    p_approver: String(formData.get('approver') ?? '') || null,
+  });
+
+  revalidatePath('/approvals');
+  if (error) redirect('/approvals?error=' + encodeURIComponent(error.message));
+  redirect('/approvals?saved=1');
+}
+
+export async function removeExternalApprover(id: string): Promise<void> {
+  const { error } = await sb().rpc('remove_external_approver', { p_approver: id });
+  revalidatePath('/approvals');
+  if (error) redirect('/approvals?error=' + encodeURIComponent(error.message));
+  redirect('/approvals?removed=1');
+}
+
+export async function setExternalQuorum(formData: FormData): Promise<void> {
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/approvals?error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('set_external_quorum', {
+    p_company: co.id,
+    p_type: String(formData.get('request_type') ?? ''),
+    p_mode: String(formData.get('mode') ?? 'any'),
+  });
+  revalidatePath('/approvals');
+  if (error) redirect('/approvals?error=' + encodeURIComponent(error.message));
+  redirect('/approvals?saved=1');
+}
+
+/** A fresh link when the first never arrived. The old one stops working. */
+export async function resendApprovalLink(taskId: string): Promise<void> {
+  const supabase = sb();
+  const { data, error } = await supabase.rpc('resend_approval_task', { p_task: taskId });
+
+  if (!error && data) {
+    const d = data as Record<string, any>;
+    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
+    const money = d.amount_minor
+      ? `\nAmount: ₦${(Number(d.amount_minor) / 100).toLocaleString('en-NG')}`
+      : '';
+    const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+    await notify({
+      companyId: String(co?.id ?? ''),
+      event: 'request.raised',
+      channel: 'email',
+      recipient: String(d.email),
+      subject: `Reminder — approval needed: ${d.reference} ${d.title}`,
+      body:
+        `${d.name},\n\nA new link for the ${d.kind} request still waiting on you.\n\n` +
+        `${d.reference} — ${d.title}${money}\n\n` +
+        `https://${root}/a/${d.token}\n\n` +
+        `Any earlier link for this request has stopped working.`,
+    });
+  }
+
+  revalidatePath('/requests');
+  if (error) redirect('/requests?error=' + encodeURIComponent(error.message));
+  redirect('/requests?resent=1');
 }
 
 export async function createCategory(formData: FormData): Promise<void> {
@@ -1565,18 +1792,6 @@ export async function updateMyProfile(formData: FormData): Promise<void> {
   redirect(error ? `/profile?error=${encodeURIComponent(error.message)}` : '/profile?saved=1');
 }
 
-export async function renameCompany(formData: FormData): Promise<void> {
-  const supabase = sb();
-  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
-  if (!co) redirect('/settings?error=' + encodeURIComponent('No company in scope.'));
-  const { error } = await supabase.rpc('rename_company', {
-    p_company: co.id,
-    p_name: String(formData.get('name') ?? ''),
-  });
-  revalidatePath('/settings');
-  revalidatePath('/', 'layout');
-  redirect(error ? `/settings?error=${encodeURIComponent(error.message)}` : '/settings?saved=1');
-}
 
 export async function resendInvitation(id: string): Promise<void> {
   const supabase = sb();

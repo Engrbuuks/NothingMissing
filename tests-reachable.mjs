@@ -12,10 +12,18 @@ const files = [];
   if (statSync(p).isDirectory()) walk(p);
   else if (f.endsWith('.tsx')) files.push(p);
 }})('src/app');
-const pages = files.map(f => readFileSync(f,'utf8')).join('\n');
+// Import lines are stripped before matching. Importing an action and never
+// using it satisfied this check while leaving the feature exactly as
+// unreachable as never writing it — which is the failure this exists to catch,
+// so counting the import defeated the whole point. Found when a rename action
+// was imported into the catalog page and wired to nothing.
+const stripImports = (src) =>
+  src.replace(/^\s*import\s[\s\S]*?from\s+['"][^'"]+['"];?/gm, '');
+
+const pages = files.map(f => stripImports(readFileSync(f,'utf8'))).join('\n');
 const actions = readFileSync('src/lib/actions.ts','utf8');
 
-// Every exported action should be referenced by at least one page.
+// Every exported action should be USED by at least one page.
 const exported = [...actions.matchAll(/export (?:async function|const) (\w+)/g)].map(m=>m[1]);
 const orphans = exported.filter(name => {
   const used = new RegExp(`\\b${name}\\b`).test(pages);

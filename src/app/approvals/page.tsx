@@ -1,6 +1,7 @@
 import Shell from '@/components/Shell';
 import { sb, getSession, hasRole } from '@/lib/session';
-import { saveApprovalPolicy, deleteApprovalPolicy } from '@/lib/actions';
+import { saveApprovalPolicy, deleteApprovalPolicy, saveExternalApprover,
+         removeExternalApprover, setExternalQuorum } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,26 @@ export default async function Approvals({
     : { data: [] as any[] };
 
   const byType = (t: string) => ((rules ?? []) as any[]).filter((r) => r.request_type === t);
+
+  // Email approvers: people with no account who sign things off from a link.
+  const companyId = (co as any)?.id ?? null;
+  const [{ data: processes }, { data: approvers }, { data: scopes }, { data: quorum }] =
+    await Promise.all([
+      supabase.rpc('approval_processes'),
+      supabase.from('external_approvers')
+        .select('id, name, email, active').eq('active', true).order('name'),
+      supabase.from('external_approver_scopes').select('approver_id, request_type'),
+      supabase.from('external_quorum').select('request_type, mode'),
+    ]);
+
+  const people = (approvers ?? []) as any[];
+  const scopeSet = new Set(
+    ((scopes ?? []) as any[]).map((r) => `${r.approver_id}|${r.request_type}`),
+  );
+  const modeFor = (t: string) =>
+    ((quorum ?? []) as any[]).find((q) => q.request_type === t)?.mode ?? 'any';
+  const approversFor = (t: string) =>
+    people.filter((p) => scopeSet.has(`${p.id}|${t}`));
 
   return (
     <Shell current="approvals" title="Who approves what" subtitle="The rules that decide how many signatures something needs">
@@ -194,6 +215,161 @@ export default async function Approvals({
           </div>
         );
       })}
+
+      {/* ------------------------------------------------------------------ *
+        * Approvers with no account.                                         *
+        * ------------------------------------------------------------------ */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-h bd">
+          <div>
+            <div className="card-t">Approve by email</div>
+            <div className="card-s">
+              A name and an address is all it takes. They get a message with the request and
+              two buttons, and never need an account — which is what the people who actually
+              hold up a purchase order are never going to create.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: 20, display: 'grid', gap: 18 }}>
+          {people.length === 0 && (
+            <p className="hint" style={{ margin: 0 }}>
+              Nobody yet. Add someone below and tick which kinds of request they should be
+              asked about.
+            </p>
+          )}
+
+          {people.map((p) => (
+            <form key={p.id} action={saveExternalApprover}
+                  style={{ display: 'grid', gap: 12, padding: 16,
+                           border: '1px solid var(--line)', borderRadius: 'var(--r)' }}>
+              <input type="hidden" name="approver" value={p.id} />
+              <div style={{ display: 'grid', gap: 12,
+                            gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
+                <div>
+                  <label className="lbl">Name</label>
+                  <input className="inp" name="name" defaultValue={p.name}
+                         disabled={!editable} required />
+                </div>
+                <div>
+                  <label className="lbl">Email</label>
+                  <input className="inp" name="email" type="email" defaultValue={p.email}
+                         disabled={!editable} required />
+                </div>
+              </div>
+
+              <div>
+                <label className="lbl">Which processes they approve</label>
+                <div className="chk-grid">
+                  {((processes ?? []) as any[]).map((proc) => (
+                    <label key={proc.request_type} className="chk">
+                      <input type="checkbox" name="types" value={proc.request_type}
+                             defaultChecked={scopeSet.has(`${p.id}|${proc.request_type}`)}
+                             disabled={!editable} />
+                      <span>
+                        <b>{proc.label}</b>
+                        <span className="hint" style={{ marginTop: 2 }}>{proc.detail}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {editable && (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-p" type="submit">Save</button>
+                  <button className="btn btn-g" type="submit"
+                          formAction={removeExternalApprover.bind(null, p.id)}
+                          style={{ color: 'var(--bad)' }}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </form>
+          ))}
+
+          {editable && (
+            <form action={saveExternalApprover}
+                  style={{ display: 'grid', gap: 12, padding: 16,
+                           border: '1px dashed var(--line)', borderRadius: 'var(--r)' }}>
+              {/* Empty, not absent. The action reads `approver` to decide
+                  between an update and an insert, and a form that omits a
+                  field its action reads sends null silently — which is the
+                  exact failure tests-forms.mjs exists to catch, and did. */}
+              <input type="hidden" name="approver" value="" />
+              <div className="card-t" style={{ fontSize: 14 }}>Add an approver</div>
+              <div style={{ display: 'grid', gap: 12,
+                            gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
+                <div>
+                  <label className="lbl">Name</label>
+                  <input className="inp" name="name" placeholder="e.g. Chief Adaeze" required />
+                </div>
+                <div>
+                  <label className="lbl">Email</label>
+                  <input className="inp" name="email" type="email"
+                         placeholder="adaeze@example.com" required />
+                </div>
+              </div>
+              <div>
+                <label className="lbl">Which processes they approve</label>
+                <div className="chk-grid">
+                  {((processes ?? []) as any[]).map((proc) => (
+                    <label key={proc.request_type} className="chk">
+                      <input type="checkbox" name="types" value={proc.request_type} />
+                      <span>
+                        <b>{proc.label}</b>
+                        <span className="hint" style={{ marginTop: 2 }}>{proc.detail}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div><button className="btn btn-p" type="submit">Add this approver</button></div>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ *
+        * How much agreement is needed.                                       *
+        * ------------------------------------------------------------------ */}
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-h bd">
+          <div>
+            <div className="card-t">How many of them have to agree</div>
+            <div className="card-s">
+              Per process. A decline always ends the request whichever setting is chosen —
+              that is a rule about how much agreement it takes to proceed, not licence to
+              ignore somebody who said no.
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 20, display: 'grid', gap: 12 }}>
+          {((processes ?? []) as any[]).map((proc) => {
+            const n = approversFor(proc.request_type).length;
+            return (
+              <form key={proc.request_type} action={setExternalQuorum}
+                    style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="hidden" name="request_type" value={proc.request_type} />
+                <span style={{ flex: 1, minWidth: 180, fontSize: 13.5, fontWeight: 600 }}>
+                  {proc.label}
+                  <span className="hint" style={{ marginTop: 2 }}>
+                    {n === 0
+                      ? 'nobody assigned, so nothing is sent'
+                      : `${n} approver${n === 1 ? '' : 's'}`}
+                  </span>
+                </span>
+                <select className="inp" name="mode" defaultValue={modeFor(proc.request_type)}
+                        disabled={!editable} style={{ maxWidth: 260 }}>
+                  <option value="any">Any one of them is enough</option>
+                  <option value="all">All of them must approve</option>
+                </select>
+                {editable && <button className="btn btn-g" type="submit">Save</button>}
+              </form>
+            );
+          })}
+        </div>
+      </div>
 
       {!editable && (
         <p className="hint">Only an owner or admin can change who approves what.</p>

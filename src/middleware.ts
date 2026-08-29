@@ -19,7 +19,7 @@ const ROOT = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'nothingmissing.ng';
 // Must stay in step with app.reserved_slugs. tests-reserved-parity.mjs checks it.
 const RESERVED = new Set([
   'www','app','api','admin','cdn','static','assets','mail','smtp','ftp',
-  'ns1','ns2','mx','dev','staging','test','demo','sandbox','l','s',
+  'ns1','ns2','mx','dev','staging','test','demo','sandbox','l','s','a',
   'auth','sign-in','signin','login','signup','sign-up','register','logout','reset','invite','join',
   'onboarding','field','home','pricing','about','blog','docs','help','legal',
   'privacy','terms','contact','status','security','waybill',
@@ -46,6 +46,18 @@ export async function middleware(request: NextRequest) {
     const token = path.slice(3);
     const url = request.nextUrl.clone();
     url.pathname = `/field/${token}`;
+    return NextResponse.rewrite(url);
+  }
+
+  // /a/<token> is the approval link that goes out by email, rewritten to
+  // /approve/<token>. Same reasoning as /l/: short enough to survive a mail
+  // client wrapping it, and the token stays in the path rather than a
+  // fragment — 0011 is the migration that exists because a fragment is never
+  // sent to the server, so a server-rendered page received nothing.
+  if (path.startsWith('/a/')) {
+    const token = path.slice(3);
+    const url = request.nextUrl.clone();
+    url.pathname = `/approve/${token}`;
     return NextResponse.rewrite(url);
   }
 

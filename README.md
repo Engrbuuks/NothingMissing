@@ -298,7 +298,15 @@ All of it stops under `prefers-reduced-motion` — verified, not assumed.
 An earlier attempt extracted it rule by rule with a regex, which lifted every
 mobile override out of its `@media` wrapper and applied it at all widths — so a
 1440px screen wore 22px padding meant for a phone, and the hero lost its 26px
-radius. Verified identical to the prototype at 1440px, 1100px and 390px.
+radius. Verified identical to the prototype at 1440px and 1100px.
+
+**No longer identical below 540px, deliberately.** The prototype was drawn at
+desktop width and its phone layout was an afterthought: the hero strip packed
+five figures two-up at 96px each, four overview stats sat in one row, and the
+tiles stayed side by side. A block at 540px stacks them. Every rule in it is
+spacing and wrapping only — nothing changes what any figure says, and the
+1440px and 1100px renderings are untouched, so the prototype remains the
+specification everywhere it was actually specified.
 
 ## Notifications
 
