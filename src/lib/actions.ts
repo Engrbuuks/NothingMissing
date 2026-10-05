@@ -1711,6 +1711,71 @@ export async function previewBranchImport(formData: FormData): Promise<void> {
   redirect(`/import/review?${qs.toString()}`);
 }
 
+/* -------------------------------------------------------------------------- *
+ * Importing inventory.
+ *
+ * Mirrors the asset import deliberately: paste, preview, confirm. The same
+ * two step shape, because the lesson behind it applies equally. Importing four
+ * hundred lines and discovering afterwards that a column was misread is how
+ * somebody ends up with four hundred items called "Qty".
+ * -------------------------------------------------------------------------- */
+
+export async function previewStockImport(formData: FormData): Promise<void> {
+  const raw = String(formData.get('sheet') ?? '');
+  const where = String(formData.get('where') ?? '').trim();
+
+  if (!raw) redirect('/import?kind=stock&error=' + encodeURIComponent('Paste your rows first.'));
+  if (!where) {
+    redirect('/import?kind=stock&error=' + encodeURIComponent('Name the location this stock sits at.'));
+  }
+
+  // 'stock', so "Code" reads as a SKU rather than an asset tag.
+  const { rows } = parseSheet(raw, 'stock');
+  if (!rows.length) {
+    redirect('/import?kind=stock&error=' + encodeURIComponent(
+      'No rows found. The first line should be your column names.'));
+  }
+
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/import?kind=stock&error=' + encodeURIComponent('No company in scope.'));
+
+  const { error } = await supabase.rpc('import_stock', {
+    p_company: co.id,
+    p_location_name: where,
+    p_rows: rows,
+    p_commit: false,
+  });
+
+  if (error) redirect('/import?kind=stock&error=' + encodeURIComponent(error.message));
+
+  const qs = new URLSearchParams({ kind: 'stock', where, sheet: raw });
+  redirect(`/import/review?${qs.toString()}`);
+}
+
+export async function commitStockImport(formData: FormData): Promise<void> {
+  const raw = String(formData.get('sheet') ?? '');
+  const where = String(formData.get('where') ?? '').trim();
+
+  const { rows } = parseSheet(raw, 'stock');
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/import?kind=stock&error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('import_stock', {
+    p_company: co.id,
+    p_location_name: where,
+    p_rows: rows,
+    p_commit: true,
+  });
+
+  revalidatePath('/inventory');
+  revalidatePath('/locations');
+
+  if (error) redirect('/import?kind=stock&error=' + encodeURIComponent(error.message));
+  redirect(`/inventory?imported=${(data as any)?.items ?? 0}`);
+}
+
 export async function commitBranchImport(formData: FormData): Promise<void> {
   const raw = String(formData.get('sheet') ?? '');
   const branch = String(formData.get('branch') ?? '').trim();

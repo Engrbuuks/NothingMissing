@@ -15,7 +15,8 @@ const short = (minor: number) => {
 
 export default async function Inventory({
   searchParams,
-}: { searchParams: { q?: string; cat?: string; loc?: string; error?: string; added?: string; moved?: string; deleted?: string } }) {
+}: { searchParams: { q?: string; cat?: string; loc?: string; error?: string; added?: string; moved?: string; deleted?: string;
+                        imported?: string } }) {
   const session = await getSession();
   const supabase = sb();
   const showCost = canSeeFinancials(session);
@@ -117,6 +118,15 @@ export default async function Inventory({
 
       {searchParams.error && <div className="notice bad"><p>{searchParams.error}</p></div>}
       {searchParams.added && <div className="notice"><p>Stock item added.</p></div>}
+      {searchParams.imported && (
+        <div className="notice">
+          <p>
+            <b>{searchParams.imported} item{searchParams.imported === '1' ? '' : 's'} imported.</b>{' '}
+            Opening quantities were received into the ledger, so each balance has a movement
+            behind it rather than simply appearing.
+          </p>
+        </div>
+      )}
       {searchParams.deleted && <div className="notice"><p>Done.</p></div>}
       {searchParams.moved && <div className="notice"><p>Recorded. The ledger has a row with your name on it.</p></div>}
       {error && <div className="notice bad"><p>{error.message}</p></div>}
@@ -140,7 +150,10 @@ export default async function Inventory({
         {filtered && <a className="btn btn-g" href="/inventory">Clear</a>}
         <a className="btn btn-g" href={`/inventory/count-sheet${floc !== 'all' ? `?loc=${floc}` : ''}`}>Count sheet</a>
         {canWrite(session) && (
-          <a className="btn btn-p" href="/inventory/new" style={{ marginLeft: 'auto' }}>Add item</a>
+          <>
+            <a className="btn btn-g" href="/import?kind=stock" style={{ marginLeft: 'auto' }}>Import</a>
+            <a className="btn btn-p" href="/inventory/new">Add item</a>
+          </>
         )}
       </form>
 
@@ -181,7 +194,10 @@ export default async function Inventory({
                 : 'Add the consumables you actually track — diesel, filters, safety gear. Anything a storekeeper counts.'}
             </p>
             {!filtered && canWrite(session) && (
-              <a className="btn btn-p" href="/inventory/new" style={{ marginTop: 18 }}>Add the first item</a>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+                <a className="btn btn-p" href="/import?kind=stock">Import a spreadsheet</a>
+                <a className="btn btn-g" href="/inventory/new">Add one by hand</a>
+              </div>
             )}
           </div>
         ) : (

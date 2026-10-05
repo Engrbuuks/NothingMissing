@@ -97,7 +97,12 @@ begin
       then coalesce(p_reason, 'No reason recorded')
            || coalesce(', until ' || p_until::text, ', with no end date')
       else 'This company will be billed normally from now on' end,
-    case when p_on then 'ok' else 'warn' end);
+    -- Cast required. app.log()'s seventh argument is app.audit_tone, and a
+    -- CASE over two string literals is `unknown`, so without this the call
+    -- resolves to no function and set_comped() fails for everyone. Postgres
+    -- does not check a plpgsql body at creation time, so it shipped looking
+    -- fine. tests-migrations.mjs now checks this position.
+    (case when p_on then 'ok' else 'warn' end)::app.audit_tone);
 
   return jsonb_build_object('company', v_name, 'comped', p_on);
 end $$;

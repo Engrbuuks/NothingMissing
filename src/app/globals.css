@@ -1649,3 +1649,10 @@ body::before{
   .segmented{width:100%;margin-left:0!important}
   .segmented a{flex:1;text-align:center}
 }
+
+/* ---------- choosing a CSV instead of pasting ---------- */
+.csvpick{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
+.csvpick-n{font-size:12.5px;color:var(--text-3);line-height:1.5;min-width:0}
+.csvpick-n b{color:var(--text-1);font-family:var(--mono);font-size:12px}
+.csvpick-n.bad{color:var(--bad)}
+.csvpick-n.bad b{color:var(--bad)}

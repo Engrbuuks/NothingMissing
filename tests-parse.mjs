@@ -11,9 +11,21 @@ const HEADER_ALIASES = {
   acquired: ['acquired','acquired on','purchase date','date purchased','date'],
   cost: ['cost','purchase cost','value','amount','price'],
 };
-function canonical(raw){
+/** Inventory files use some of the same words for different things: "Code" is
+ *  an asset tag on a register and a SKU on a stock list. */
+const STOCK_ALIASES = {
+  sku: ['sku','code','item code','part no','part number','stock code','ref'],
+  name: ['name','item','description','particulars','item name','product','material'],
+  category: ['category','class','group','type'],
+  unit: ['unit','uom','unit of measure','units','measure'],
+  qty: ['qty','quantity','opening','opening balance','balance','stock','on hand','count'],
+  reorder: ['reorder','reorder point','reorder level','min','minimum','min level'],
+  cost: ['cost','unit cost','price','unit price','value','rate'],
+};
+function canonical(raw, kind='assets'){
   const h = raw.toLowerCase().replace(/[_.]/g,' ').replace(/\s+/g,' ').trim();
-  for (const [k,a] of Object.entries(HEADER_ALIASES)) if (a.includes(h)) return k;
+  const map = kind === 'stock' ? STOCK_ALIASES : HEADER_ALIASES;
+  for (const [k,a] of Object.entries(map)) if (a.includes(h)) return k;
   return null;
 }
 function splitLine(line){
@@ -48,6 +60,47 @@ else console.log('  ✓ commas inside quotes survive:', JSON.stringify(cells));
 const tabbed = splitLine('NM-1\tLenovo AIO\tSN-1');
 if(tabbed.length!==3){console.log('  FAIL tab-separated'); bad++;}
 else console.log('  ✓ tab-separated (pasted from Excel) works');
+
+console.log('\n  inventory headers:');
+const stockCases = [
+  ['SKU','sku'], ['Item Code','sku'], ['Part No.','sku'], ['Code','sku'],
+  ['Item','name'], ['Description','name'], ['Material','name'],
+  ['Qty','qty'], ['Quantity','qty'], ['On Hand','qty'], ['Opening Balance','qty'],
+  ['Unit','unit'], ['UOM','unit'], ['Unit of Measure','unit'],
+  ['Reorder Level','reorder'], ['Min Level','reorder'],
+  ['Unit Cost','cost'], ['Rate','cost'],
+  ['Nonsense Column',null],
+];
+for(const [input,want] of stockCases){
+  const got=canonical(input,'stock');
+  if(got!==want){console.log(`  FAIL "${input}" -> ${got}, wanted ${want}`); bad++;}
+  else console.log(`  ✓ "${input}" -> ${got}`);
+}
+
+// "Code" has to mean different things on the two kinds of file. If it ever
+// resolved the same way for both, one of the two imports is reading the wrong
+// column and nothing else would say so.
+if(canonical('Code','assets')!=='tag' || canonical('Code','stock')!=='sku'){
+  console.log('  FAIL "Code" must be a tag on an asset file and a SKU on a stock file'); bad++;
+} else console.log('  ✓ "Code" means tag for assets and sku for stock');
+
+// ---- the maps above are a copy; prove they still match the real parser ----
+// A test carrying its own duplicate of the thing it tests passes happily while
+// the source drifts underneath it.
+import { readFileSync } from 'node:fs';
+const src = readFileSync('src/lib/sheet.ts','utf8');
+for (const [label, local] of [['HEADER_ALIASES',HEADER_ALIASES],['STOCK_ALIASES',STOCK_ALIASES]]) {
+  const m = src.match(new RegExp(`const ${label}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+  if(!m){ console.log(`  FAIL could not find ${label} in src/lib/sheet.ts`); bad++; continue; }
+  const real = {};
+  for (const line of m[1].split('\n')) {
+    const km = line.match(/^\s*([a-z]+):\s*\[(.*)\],?\s*$/);
+    if(km) real[km[1]] = [...km[2].matchAll(/'([^']*)'/g)].map(x=>x[1]);
+  }
+  const a = JSON.stringify(local), b = JSON.stringify(real);
+  if(a!==b){ console.log(`  FAIL ${label} here no longer matches src/lib/sheet.ts`); bad++; }
+  else console.log(`  ✓ ${label} matches the real parser`);
+}
 
 console.log(bad?`\n✗ ${bad} failures`:'\n✓ sheet parsing correct');
 process.exit(bad?1:0);

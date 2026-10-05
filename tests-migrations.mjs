@@ -10,7 +10,7 @@
 // Gaps are reported but do not fail: a number retired deliberately is a
 // reasonable thing, whereas two files answering to one number never is.
 
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIR = join(process.cwd(), 'backend', 'supabase', 'migrations');
@@ -45,11 +45,38 @@ for (const f of files) {
   byNumber.get(n).push(f);
 }
 
+// The name after the number, e.g. `fuel_fleet`. A rename changes the number
+// and keeps this, which is how a leftover is told apart from a collision.
+const stem = (f) => f.replace(/^\d{4}_/, '').replace(/\.sql$/, '');
+const read = (f) => { try { return readFileSync(join(DIR, f), 'utf8'); } catch { return null; } };
+
 const duplicates = [...byNumber.entries()].filter(([, fs]) => fs.length > 1);
 if (duplicates.length) {
   for (const [n, fs] of duplicates) {
     fail(`${fs.length} migrations numbered ${n}: ${fs.join(', ')}`);
-    fail(`  applying by hand has no defined order — renumber the later one`);
+
+    // Two very different causes need two very different fixes, and telling
+    // somebody to "renumber the later one" when the file is a leftover copy
+    // sends them to do the wrong thing carefully.
+    let explained = false;
+
+    for (const f of fs) {
+      // Extracting a zip over a repo adds and overwrites but never deletes, so
+      // a renamed migration leaves its old name behind and both apply.
+      const twin = files.find((o) => o !== f && stem(o) === stem(f));
+      if (twin) {
+        const same = read(f) !== null && read(f) === read(twin);
+        fail(`  ${f} is a leftover: the same migration now lives at ${twin}` +
+             (same ? ' (byte-identical)' : ' (contents differ, check before deleting)'));
+        fail(`  → DELETE ${f}. Renumbering it would apply the same migration twice.`);
+        explained = true;
+      }
+    }
+
+    if (!explained) {
+      fail(`  applying by hand has no defined order: renumber the later one,`);
+      fail(`  or delete it if the two implement the same feature two ways`);
+    }
   }
 } else {
   pass('no two migrations share a number');
@@ -79,6 +106,55 @@ console.log(
     : `\n  ${numbers.length} migrations, ${String(numbers[0]).padStart(4, '0')} to ` +
       `${String(numbers[numbers.length - 1]).padStart(4, '0')}, no gaps`,
 );
+
+// ── the tone argument of app.log() must be cast ────────────────────────────
+// A CASE over two string literals is `unknown`, and app.log()'s seventh
+// argument is app.audit_tone, so an uncast CASE there resolves to no function
+// at all. Postgres does not check a plpgsql body at creation time, so it only
+// fails when that line runs: 0041 passed its dry run and broke on commit,
+// because the dry run never reaches the log call. Second occurrence, so it
+// earns a check.
+//
+// Only the seventh argument. CASE in the action name or inside format() is
+// ordinary text and perfectly fine, and a check that flags those is a check
+// that cries wolf until somebody stops reading it.
+const TONE_ARG = 6; // zero based
+
+/** Splits on top level commas, ignoring those inside parens or quotes. */
+function splitArgs(src) {
+  const out = [];
+  let cur = '', depth = 0, quoted = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "'" && src[i - 1] !== '\\') quoted = !quoted;
+    if (!quoted) {
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      else if (c === ',' && depth === 0) { out.push(cur); cur = ''; continue; }
+    }
+    cur += c;
+  }
+  out.push(cur);
+  return out.map((a) => a.trim());
+}
+
+let toneChecked = 0, toneBad = 0;
+for (const f of files) {
+  const body = read(f);
+  if (!body) continue;
+  for (const call of body.matchAll(/perform\s+app\.log\s*\(([\s\S]*?)\);/gi)) {
+    const args = splitArgs(call[1]);
+    if (args.length <= TONE_ARG) continue; // tone left to its default
+    const tone = args[TONE_ARG];
+    toneChecked++;
+    if (/\bcase\s+when\b/i.test(tone) && !/::\s*app\.audit_tone/i.test(tone)) {
+      fail(`${f}: the tone argument of app.log() is an uncast CASE, add ::app.audit_tone`);
+      fail(`  ${tone.replace(/\s+/g, ' ').slice(0, 72)}…`);
+      toneBad++;
+    }
+  }
+}
+if (toneBad === 0) pass(`every app.log() tone argument is typed (${toneChecked} checked)`);
 
 console.log(failed ? '\n✗ migration numbering is ambiguous' : '\n✓ migration numbering is unambiguous');
 process.exit(failed ? 1 : 0);

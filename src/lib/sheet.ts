@@ -25,11 +25,32 @@ const HEADER_ALIASES: Record<string, string[]> = {
   cost: ['cost', 'purchase cost', 'value', 'amount', 'price'],
 };
 
-export function canonicalHeader(raw: string): string | null {
+/**
+ * Inventory columns. A separate map rather than more aliases on the one above,
+ * because the same word means different things on the two kinds of file:
+ * "Code" is an asset tag on a register and a SKU on a stock list, and a single
+ * map would have to pick one and be wrong half the time. Keeping them apart
+ * also means the asset import behaves exactly as it did, which matters when
+ * fourteen header spellings are already covered by tests.
+ */
+const STOCK_ALIASES: Record<string, string[]> = {
+  sku: ['sku', 'code', 'item code', 'part no', 'part number', 'stock code', 'ref'],
+  name: ['name', 'item', 'description', 'particulars', 'item name', 'product', 'material'],
+  category: ['category', 'class', 'group', 'type'],
+  unit: ['unit', 'uom', 'unit of measure', 'units', 'measure'],
+  qty: ['qty', 'quantity', 'opening', 'opening balance', 'balance', 'stock', 'on hand', 'count'],
+  reorder: ['reorder', 'reorder point', 'reorder level', 'min', 'minimum', 'min level'],
+  cost: ['cost', 'unit cost', 'price', 'unit price', 'value', 'rate'],
+};
+
+export type SheetKind = 'assets' | 'stock';
+
+export function canonicalHeader(raw: string, kind: SheetKind = 'assets'): string | null {
   // Trim AFTER collapsing punctuation: "Serial No." becomes "serial no " and
   // then "serial no", which is the alias. Trimming first leaves the space.
   const h = raw.toLowerCase().replace(/[_.]/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const [key, aliases] of Object.entries(HEADER_ALIASES)) {
+  const map = kind === 'stock' ? STOCK_ALIASES : HEADER_ALIASES;
+  for (const [key, aliases] of Object.entries(map)) {
     if (aliases.includes(h)) return key;
   }
   return null;
@@ -53,7 +74,7 @@ export function splitLine(line: string): string[] {
   return out.map((s) => s.trim());
 }
 
-export function parseSheet(raw: string): {
+export function parseSheet(raw: string, kind: SheetKind = 'assets'): {
   rows: Record<string, string>[];
   headers: string[];
   unknown: string[];
@@ -62,7 +83,7 @@ export function parseSheet(raw: string): {
   if (lines.length < 2) return { rows: [], headers: [], unknown: [] };
 
   const rawHeaders = splitLine(lines[0]);
-  const mapped = rawHeaders.map(canonicalHeader);
+  const mapped = rawHeaders.map((h) => canonicalHeader(h, kind));
   const unknown = rawHeaders.filter((h, i) => h && !mapped[i]);
 
   const rows = lines

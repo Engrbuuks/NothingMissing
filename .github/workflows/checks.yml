@@ -40,6 +40,11 @@ jobs:
       - name: spreadsheet parsing
         run: node tests-parse.mjs
 
+      # A template offering a column the parser ignores is worse than no
+      # template: the import succeeds and the data is quietly absent.
+      - name: the CSV templates still import
+        run: node tests-templates.mjs
+
       # Every RPC a page calls and every table it queries must exist. A
       # mismatch is invisible until somebody opens the page and gets nothing.
       - name: pages match the schema
