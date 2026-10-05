@@ -26,6 +26,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
   // How many of this thing. One line can be fifty chairs, each still becoming
   // its own asset with its own tag.
   units: ['units', 'unit', 'qty', 'quantity', 'number', 'no of units', 'count', 'pieces', 'nos'],
+  // Where each row goes. Blank falls back to the location typed on the page.
+  location: ['location', 'site', 'branch', 'where', 'office', 'depot', 'store', 'place'],
 };
 
 /**

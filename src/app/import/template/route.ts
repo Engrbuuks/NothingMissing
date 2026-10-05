@@ -13,13 +13,13 @@
  */
 export const dynamic = 'force-dynamic';
 
-const ASSETS = `Name,Units,Serial No.,Category,Type,Make,Model,Assigned To,Purchase Cost,Date Purchased
-Lenovo ThinkCentre M90a,1,SN-4471,IT equipment,Desktop computer,Lenovo,ThinkCentre M90a,Gabriel,480000,2026-02-11
-Lenovo ThinkCentre M90a,1,SN-4472,IT equipment,Desktop computer,Lenovo,ThinkCentre M90a,Accounts,480000,2026-02-11
-Task chair mesh back,50,,Furniture,Seating,Ergo,Mesh Task,,42000,
-Meeting table 6 seater,8,,Furniture,Tables,Ergo,Oak 6S,,185000,
-Perkins 100 kVA generator,1,PK-99823,Power,Generator,Perkins,1104A-44TG2,Facilities,8450000,2025-11-03
-Standing fan,12,,,,,,,,
+const ASSETS = `Name,Units,Location,Assigned To,Serial No.,Category,Type,Make,Model,Purchase Cost,Date Purchased
+Lenovo ThinkCentre M90a,1,Operations Floor 1,Gabriel,SN-4471,IT equipment,Desktop computer,Lenovo,ThinkCentre M90a,480000,2026-02-11
+Lenovo ThinkCentre M90a,1,Operations Floor 1,Accounts,SN-4472,IT equipment,Desktop computer,Lenovo,ThinkCentre M90a,480000,2026-02-11
+Task chair mesh back,50,Operations Floor 2,,,Furniture,Seating,Ergo,Mesh Task,42000,
+Meeting table 6 seater,8,Boardroom,,,Furniture,Tables,Ergo,Oak 6S,185000,
+Perkins 100 kVA generator,1,Generator House,Facilities,PK-99823,Power,Generator,Perkins,1104A-44TG2,8450000,2025-11-03
+Standing fan,12,,,,,,,,,
 `;
 
 const STOCK = `Item,SKU,Category,Unit,Quantity,Reorder Level,Unit Cost

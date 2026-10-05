@@ -135,6 +135,15 @@ Meeting table,,Furniture,Tables,Ergo,6-seater Oak,Boardroom,185000`}
                 </p>
               </div>
               <div>
+                <h4>Placing and assigning them</h4>
+                <p>
+                  <span className="mono">Location</span> puts each row where it belongs, so one
+                  file can fill several rooms. Leave it blank and the row goes to the location
+                  named above. <span className="mono">Assigned To</span> is the person or team
+                  holding it.
+                </p>
+              </div>
+              <div>
                 <h4>Everything else is optional</h4>
                 <p>
                   <span className="mono">Serial</span>, <span className="mono">Category</span>,
