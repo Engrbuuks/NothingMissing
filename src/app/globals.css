@@ -269,11 +269,6 @@ tbody tr:last-child td{border-bottom:none}
 /* Marks the one field a form insists on. Marking the required field is
    clearer than marking every optional one, because on these forms almost
    everything is optional and a wall of "optional" reads as noise. */
-/* An inline correction, not a form. Sized to sit in a list row without
-   making every row look like an input field waiting to be filled in. */
-.inp-inline{padding:5px 9px;border-radius:8px;font-size:13.5px;font-weight:600;border-color:transparent;background:transparent}
-.inp-inline:hover{border-color:var(--line);background:var(--surface)}
-.inp-inline:focus{border-color:var(--brand);background:var(--surface);box-shadow:0 0 0 3px var(--brand-soft)}
 .btn-xs{padding:5px 9px;font-size:12px}
 .req{font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--brand);background:var(--brand-soft);border-radius:20px;padding:2px 7px;margin-left:7px;vertical-align:1px}
 .inp{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:13.5px;background:var(--surface)}
@@ -1671,3 +1666,24 @@ body::before{
 /* ---------- "blanks are fine" note above the paste box ---------- */
 .blanks{font-size:12.5px;line-height:1.6;color:var(--text-3);background:#FBFBFE;border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin:0 0 14px}
 .blanks b{color:var(--text-1)}
+
+/* ============================================================================
+   CATALOG LIST ROWS
+   The name, its count and its buttons used to share one flex line. In a three
+   column grid that line is about 420px, and the input was the only item able
+   to give way, so it shrank to roughly forty pixels and "Accessories" read as
+   "Acc". The name now has a line of its own and cannot be squeezed by anything
+   beside it.
+   ========================================================================== */
+.catrow{display:flex;align-items:flex-start;gap:11px;padding:13px 20px;border-bottom:1px solid var(--line-2)}
+.catrow:last-child{border-bottom:none}
+.catrow:hover{background:#FCFCFE}
+/* min-width:0 is the load bearing part: without it a flex item refuses to
+   shrink below its content and the row overflows the card instead. */
+.catrow-b{flex:1;min-width:0}
+.catrow-dot{width:10px;height:10px;border-radius:3px;flex:none;margin-top:14px}
+.catrow-av{flex:none;margin-top:3px}
+.catrow-n{font-size:13.5px;font-weight:600;line-height:1.4;word-break:break-word}
+.catrow-a{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.catrow-m{font-family:var(--mono);font-size:11.5px;color:var(--text-3);margin-right:auto;white-space:nowrap}
+.catrow-sp{flex:1}

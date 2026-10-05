@@ -246,27 +246,43 @@ export default async function Catalog({
             {categories.map((c, i) => {
               const n = subCats.filter((s) => s.category_id === c.id).length;
               return (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT_COLOUR[i % CAT_COLOUR.length] }} />
-                  {canWrite(session) ? (
-                    /* Editable in place. A rename is not a form somebody goes
-                       looking for — it is a correction made at the moment the
-                       mistake is noticed, which is while reading the list. */
-                    <form action={renameCategory.bind(null, c.id)}
-                          style={{ flex: 1, display: 'flex', gap: 6 }}>
-                      <input className="inp inp-inline" name="name" defaultValue={c.name}
-                             aria-label={`Rename ${c.name}`} required />
-                      <button className="btn btn-g btn-xs" type="submit">Save</button>
-                    </form>
-                  ) : (
-                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{c.name}</span>
-                  )}
-                  <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} type{n === 1 ? '' : 's'}</span>
-                  {canWrite(session) && (
-                    <form action={deleteCategory.bind(null, c.id)}>
-                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
-                    </form>
-                  )}
+                /* The name gets a line of its own. Sharing one line with the
+                   count and the buttons meant the input was the only item that
+                   could give way in a narrow column, so it collapsed to about
+                   forty pixels and "Accessories" read as "Acc". */
+                <div key={c.id} className="catrow">
+                  <span className="catrow-dot"
+                        style={{ background: CAT_COLOUR[i % CAT_COLOUR.length] }} />
+                  <div className="catrow-b">
+                    {canWrite(session) ? (
+                      <>
+                        {/* The button sits outside the form and reaches it by
+                            id, because forms cannot be nested and Delete needs
+                            its own. */}
+                        <form id={`cat-${c.id}`} action={renameCategory.bind(null, c.id)}>
+                          <input className="inp" name="name" defaultValue={c.name}
+                                 aria-label={`Rename ${c.name}`} required />
+                        </form>
+                        <div className="catrow-a">
+                          <span className="catrow-m">{n} type{n === 1 ? '' : 's'}</span>
+                          <button className="btn btn-g btn-xs" type="submit" form={`cat-${c.id}`}>
+                            Save
+                          </button>
+                          <form action={deleteCategory.bind(null, c.id)}>
+                            <button className="btn btn-g btn-xs" type="submit"
+                                    style={{ color: 'var(--bad)' }}>Delete</button>
+                          </form>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="catrow-n">{c.name}</div>
+                        <div className="catrow-a">
+                          <span className="catrow-m">{n} type{n === 1 ? '' : 's'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -288,23 +304,33 @@ export default async function Catalog({
             {subCats.map((s) => {
               const cat = categories.find((c) => c.id === s.category_id);
               return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
-                  {canWrite(session) ? (
-                    <form action={renameSubCategory.bind(null, s.id)}
-                          style={{ flex: 1, display: 'flex', gap: 6 }}>
-                      <input className="inp inp-inline" name="name" defaultValue={s.name}
-                             aria-label={`Rename ${s.name}`} required />
-                      <button className="btn btn-g btn-xs" type="submit">Save</button>
-                    </form>
-                  ) : (
-                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{s.name}</span>
-                  )}
-                  <span className="pill p-mute">{cat?.name ?? '—'}</span>
-                  {canWrite(session) && (
-                    <form action={deleteSubCategory.bind(null, s.id)}>
-                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
-                    </form>
-                  )}
+                <div key={s.id} className="catrow">
+                  <div className="catrow-b">
+                    {canWrite(session) ? (
+                      <>
+                        <form id={`sub-${s.id}`} action={renameSubCategory.bind(null, s.id)}>
+                          <input className="inp" name="name" defaultValue={s.name}
+                                 aria-label={`Rename ${s.name}`} required />
+                        </form>
+                        <div className="catrow-a">
+                          <span className="pill p-mute">{cat?.name ?? '—'}</span>
+                          <span className="catrow-sp" />
+                          <button className="btn btn-g btn-xs" type="submit" form={`sub-${s.id}`}>
+                            Save
+                          </button>
+                          <form action={deleteSubCategory.bind(null, s.id)}>
+                            <button className="btn btn-g btn-xs" type="submit"
+                                    style={{ color: 'var(--bad)' }}>Delete</button>
+                          </form>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="catrow-n">{s.name}</div>
+                        <div className="catrow-a"><span className="pill p-mute">{cat?.name ?? '—'}</span></div>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -331,26 +357,38 @@ export default async function Catalog({
             {brandList.map((b) => {
               const n = modelList.filter((m) => m.brand_id === b.id).length;
               return (
-                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 20px' }}>
-                  <span className="br-i" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>
+                <div key={b.id} className="catrow">
+                  <span className="br-i catrow-av"
+                        style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>
                     {b.name.slice(0, 2).toUpperCase()}
                   </span>
-                  {canWrite(session) ? (
-                    <form action={renameBrand.bind(null, b.id)}
-                          style={{ flex: 1, display: 'flex', gap: 6 }}>
-                      <input className="inp inp-inline" name="name" defaultValue={b.name}
-                             aria-label={`Rename ${b.name}`} required />
-                      <button className="btn btn-g btn-xs" type="submit">Save</button>
-                    </form>
-                  ) : (
-                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{b.name}</span>
-                  )}
-                  <span className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{n} model{n === 1 ? '' : 's'}</span>
-                  {canWrite(session) && (
-                    <form action={deleteBrand.bind(null, b.id)}>
-                      <button className="btn btn-g" type="submit" style={{ padding: '5px 9px', fontSize: 12, color: 'var(--bad)' }}>Delete</button>
-                    </form>
-                  )}
+                  <div className="catrow-b">
+                    {canWrite(session) ? (
+                      <>
+                        <form id={`brand-${b.id}`} action={renameBrand.bind(null, b.id)}>
+                          <input className="inp" name="name" defaultValue={b.name}
+                                 aria-label={`Rename ${b.name}`} required />
+                        </form>
+                        <div className="catrow-a">
+                          <span className="catrow-m">{n} model{n === 1 ? '' : 's'}</span>
+                          <button className="btn btn-g btn-xs" type="submit" form={`brand-${b.id}`}>
+                            Save
+                          </button>
+                          <form action={deleteBrand.bind(null, b.id)}>
+                            <button className="btn btn-g btn-xs" type="submit"
+                                    style={{ color: 'var(--bad)' }}>Delete</button>
+                          </form>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="catrow-n">{b.name}</div>
+                        <div className="catrow-a">
+                          <span className="catrow-m">{n} model{n === 1 ? '' : 's'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
