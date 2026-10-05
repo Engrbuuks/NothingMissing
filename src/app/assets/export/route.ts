@@ -24,6 +24,48 @@ export async function GET(request: Request) {
   const cat = url.searchParams.get('cat');
   const loc = url.searchParams.get('loc');
   const status = url.searchParams.get('status');
+  // The register is batched by default, so an export that always listed every
+  // unit would no longer be what was on screen. Same switch, same shape.
+  const units = url.searchParams.get('view') === 'units';
+
+  if (!units) {
+    const { data: groups, error } = await supabase.rpc('register_groups', {
+      p_q: q || null,
+      p_cat: cat && cat !== 'all' ? cat : null,
+      p_loc: loc && loc !== 'all' ? loc : null,
+      p_status: status && status !== 'all' ? status : null,
+    });
+    if (error) return new Response(error.message, { status: 400 });
+
+    const rows = (groups ?? []) as any[];
+    // Null throughout means the role cannot read financials, so the column
+    // comes off rather than exporting blanks that read as missing data.
+    const withCost = rows.some((g) => g.cost_minor != null);
+
+    const header = [
+      'units', 'name', 'category', 'brand', 'model',
+      'location', 'status', 'assigned_to', 'units_with_serial', 'sample_tags',
+      ...(withCost ? ['purchase_cost_naira'] : []),
+    ];
+    const lines = [header.join(',')];
+    for (const g of rows) {
+      lines.push([
+        g.units, g.name, g.category_name, g.brand_name, g.model_name,
+        g.status === 'transit' ? 'In transit' : g.location_name,
+        g.status, g.holder, g.with_serial, g.sample_tags,
+        ...(withCost ? [g.cost_minor != null ? g.cost_minor / 100 : ''] : []),
+      ].map(esc).join(','));
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    return new Response('\uFEFF' + lines.join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="register-batched-${stamp}.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   let query = supabase
     .from('assets')

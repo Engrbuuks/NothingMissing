@@ -1628,3 +1628,24 @@ body::before{
 .chk span{min-width:0;font-size:13px;line-height:1.35}
 .chk .hint{display:block;margin-top:3px}
 @media(max-width:540px){.chk-grid{grid-template-columns:1fr}}
+
+/* ============================================================================
+   THE BATCHED REGISTER
+   The count is the first thing read on a line, so it carries the weight a tag
+   used to and none of the noise. It is a link, because the number is also the
+   way in to the individual units behind it.
+   ========================================================================== */
+.batch{display:inline-grid;place-items:center;min-width:44px;height:30px;padding:0 10px;border-radius:9px;background:var(--brand-soft);color:var(--brand-ink,var(--brand));font-family:var(--display);font-size:15px;font-weight:800;letter-spacing:-.02em;transition:.14s}
+.batch:hover{background:var(--brand);color:#fff}
+
+/* Two resolutions of one register, so the switch sits with the heading rather
+   than in the filter bar where it would read as another filter. */
+.segmented{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
+.segmented a{padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--text-3);background:var(--surface);transition:.14s;white-space:nowrap}
+.segmented a+a{border-left:1px solid var(--line)}
+.segmented a:hover{background:#FBFBFE;color:var(--text-1)}
+.segmented a.on{background:var(--brand);color:#fff}
+@media(max-width:540px){
+  .segmented{width:100%;margin-left:0!important}
+  .segmented a{flex:1;text-align:center}
+}
