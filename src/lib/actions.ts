@@ -30,58 +30,59 @@ export type ActionResult = { ok: true; message: string } | { ok: false; error: s
 export async function createTransfer(formData: FormData): Promise<void> {
   const from = String(formData.get('from') ?? '');
   const to = String(formData.get('to') ?? '');
-  const reason = String(formData.get('reason') ?? '');
-  const driver = String(formData.get('driver') ?? '');
-  const plate = String(formData.get('plate') ?? '');
-  const assetIds = formData.getAll('asset').map(String);
 
-  if (!from || !to || assetIds.length === 0) {
-    redirect('/transfers/new?error=' + encodeURIComponent('Pick at least one asset and a destination.'));
+  // Quantities and group keys arrive as two lists in document order — one
+  // hidden `group` and one `qty` per row, rendered together. HTML form
+  // serialisation preserves that order, so index i of one belongs to index i
+  // of the other.
+  const groups = formData.getAll('group').map(String);
+  const quantities = formData.getAll('qty').map(String);
+
+  const lines = groups
+    .map((key, i) => {
+      const qty = Number(quantities[i] ?? 0);
+      // The key is `name|model_id`. Asset names may contain a pipe, so the
+      // split takes the LAST one: a uuid never does.
+      const cut = key.lastIndexOf('|');
+      return {
+        name: cut === -1 ? key : key.slice(0, cut),
+        model_id: cut === -1 ? null : key.slice(cut + 1) || null,
+        qty,
+      };
+    })
+    .filter((l) => Number.isFinite(l.qty) && l.qty > 0);
+
+  // Still supported, and now additive to the quantities: "that generator plus
+  // three more of them" is one submission rather than two transfers.
+  const named = formData.getAll('asset').map(String).filter(Boolean);
+
+  if (!from || !to) {
+    redirect('/transfers/new?error=' + encodeURIComponent('Pick where it is coming from and going to.'));
+  }
+  if (lines.length === 0 && named.length === 0) {
+    redirect(`/transfers/new?from=${from}&error=` +
+      encodeURIComponent('Nothing to move — type a number against at least one line.'));
   }
 
-  const supabase = sb();
-
-  const { data: company } = await supabase.from('locations').select('company_id').eq('id', from).single();
-  if (!company) redirect('/transfers/new?error=' + encodeURIComponent('That origin could not be read.'));
-
-  const { data: ref } = await supabase.rpc('next_doc_number', {
-    p_company: company.company_id,
-    p_kind: 'request',
+  // One call, one transaction. Choosing which specific assets fill a quantity
+  // has to happen in the database: it locks the rows it takes, so two people
+  // drafting from the same shelf at the same moment cannot both be handed the
+  // same chairs. Doing it here would read, then write, with a gap in between.
+  const { data, error } = await sb().rpc('create_grouped_transfer', {
+    p_from: from,
+    p_to: to,
+    p_lines: lines,
+    p_assets: named,
+    p_reason: String(formData.get('reason') ?? '') || null,
+    p_driver: String(formData.get('driver') ?? '') || null,
+    p_plate: String(formData.get('plate') ?? '') || null,
   });
 
-  const { data: transfer, error } = await supabase
-    .from('transfers')
-    .insert({
-      company_id: company.company_id,
-      reference: ref ?? `TR-${Date.now()}`,
-      from_location: from,
-      to_location: to,
-      status: 'draft',
-      reason: reason || null,
-      driver_name: driver || null,
-      vehicle_reg: plate || null,
-    })
-    .select('id')
-    .single();
-
-  if (error || !transfer) {
-    redirect('/transfers/new?error=' + encodeURIComponent(error?.message ?? 'Could not create the transfer.'));
-  }
-
-  const { error: lineErr } = await supabase.from('transfer_lines').insert(
-    assetIds.map((asset_id) => ({
-      company_id: company.company_id,
-      transfer_id: transfer.id,
-      asset_id,
-    }))
-  );
-
-  if (lineErr) {
-    redirect('/transfers/new?error=' + encodeURIComponent(lineErr.message));
-  }
-
   revalidatePath('/transfers');
-  redirect(`/transfers/${transfer.id}`);
+  if (error) {
+    redirect(`/transfers/new?from=${from}&error=` + encodeURIComponent(error.message));
+  }
+  redirect(`/transfers/${(data as any)?.transfer}`);
 }
 
 /** Approve without a request chain — owners and admins only, per RLS. */
