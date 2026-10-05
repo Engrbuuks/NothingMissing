@@ -1703,12 +1703,25 @@ export async function previewBranchImport(formData: FormData): Promise<void> {
 
   if (error) redirect('/import?error=' + encodeURIComponent(error.message));
 
-  // The preview is held in the URL rather than a session: a refresh should show
-  // the same preview, and nothing has been written yet to lose.
-  const qs = new URLSearchParams({
-    branch, existing, city: String(formData.get('city') ?? ''), sheet: raw,
+  // The sheet is parked server side and the URL carries only its id.
+  //
+  // It used to carry the sheet itself, which worked on a small file and failed
+  // silently on a real one: percent encoding turns every comma and newline into
+  // three bytes, so a header cap of 16 KB arrives at about 170 rows, and an
+  // over-long redirect does not report anything — the page simply does not
+  // change. A refresh still shows the same preview, which was the reason for
+  // putting it in the URL in the first place.
+  const { data: draft, error: parkError } = await supabase.rpc('park_import_draft', {
+    p_company: co.id,
+    p_kind: 'assets',
+    p_sheet: raw,
+    p_branch: branch || null,
+    p_existing: existing || null,
+    p_city: String(formData.get('city') ?? '') || null,
   });
-  redirect(`/import/review?${qs.toString()}`);
+  if (parkError) redirect('/import?error=' + encodeURIComponent(parkError.message));
+
+  redirect(`/import/review?draft=${draft}`);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1749,8 +1762,17 @@ export async function previewStockImport(formData: FormData): Promise<void> {
 
   if (error) redirect('/import?kind=stock&error=' + encodeURIComponent(error.message));
 
-  const qs = new URLSearchParams({ kind: 'stock', where, sheet: raw });
-  redirect(`/import/review?${qs.toString()}`);
+  const { data: draft, error: parkError } = await supabase.rpc('park_import_draft', {
+    p_company: co.id,
+    p_kind: 'stock',
+    p_sheet: raw,
+    p_where_name: where,
+  });
+  if (parkError) {
+    redirect('/import?kind=stock&error=' + encodeURIComponent(parkError.message));
+  }
+
+  redirect(`/import/review?draft=${draft}`);
 }
 
 export async function commitStockImport(formData: FormData): Promise<void> {

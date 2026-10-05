@@ -61,7 +61,7 @@ then open `http://eppme.localhost:3000`.
     src/lib/actions.ts       server actions — each calls a database function
     src/app/diagnostics      checks the wiring and reports what this session reaches
 
-    backend/                 34 Postgres migrations, the test suite, bootstrap.sql
+    backend/                 46 Postgres migrations, the test suite, bootstrap.sql
     public/prototype/        the original clickable prototype, kept as the spec
 
 The prototype stays reachable at `/prototype/app.html`. It is a specification,
@@ -91,7 +91,7 @@ write policy, purchase cost behind its own table, an append-only audit log, and
 the atomic transfer acceptance.
 
 To set up a real project: run **every** migration in `backend/supabase/migrations`
-in numerical order — `0001` through `0034` — in the Supabase SQL editor, then
+in numerical order — `0001` through `0046` — in the Supabase SQL editor, then
 `bootstrap.sql` once.
 
 Run them **all**. An earlier version of this file said `0001` through `0011`,
@@ -707,6 +707,91 @@ functions from both. Two files with the same number apply in whatever order the
 shell happens to glob them, which is not a thing to leave in a repository. The
 orphaned migration and its two dead actions are gone; the pages only ever used
 the surviving one.
+
+## The Import button did nothing (0045, 0046)
+
+Reported as "the Import button at the end of the process is not working", which
+is the hardest kind of report to act on and the most honest description of what
+happened.
+
+It was not the button. `app.next_asset_tag()` read the highest number already
+issued, which meant a regular expression scan of every asset in the company.
+Correct, and fine for one asset added through a form. Run once per asset
+created, it is quadratic:
+
+    1,600 assets into an empty register      4.4 s
+    1,600 more, register now holds 1,608    11.9 s
+    1,600 more, register now holds 3,208    19.3 s
+
+A hosted function is killed at ten to fifteen seconds. So a real import of a
+real register did not fail. It stopped. Nothing was written, no error was
+raised, and there was nothing for the person to read. The button appeared dead.
+
+`0045` replaces the scan with a counter, seeded once per company from the
+numbering already in use and then incremented with an indexed update. A tag now
+costs the same on a register of ten thousand as on an empty one, and 1,600
+assets import in under a second.
+
+### The fix that read as though it worked
+
+The first version of `0045` seeded the counter like this:
+
+    insert into app.asset_tag_counters (company_id, prefix, last_value)
+    select p_company, v_prefix, coalesce(max(...), 0) from app.assets ...
+    on conflict (company_id, prefix) do nothing;
+
+The comment above it said the scan runs once and every later call skips it on
+the conflict. It does not. `ON CONFLICT` discards the row *after* the SELECT has
+been evaluated, so the scan was still paid for on every call. Measured: 5.1 s,
+12.5 s, 21.0 s for three identical files, the numbers it was written to fix,
+unchanged. The counter advanced perfectly the whole time.
+
+That is a worse bug than the one it replaced, because the code reads as though
+it were fixed. It was caught by running the measurement again rather than by
+reading the function again. Asking `if not exists` first turns the scan into one
+cheap index probe: the same 200 calls went from 2,824 ms to 12 ms.
+
+The counter also fixes something `0042` had to leave standing. `max()` falls
+back when the highest numbered assets are deleted, so their numbers came round
+again and a printed label could end up naming a different object. A counter
+only goes up.
+
+### A second way the same button could do nothing
+
+`previewBranchImport` redirected to the review page with the whole spreadsheet
+in the query string. Percent encoding turns every comma and newline into three
+bytes, so a 4 KB file becomes a 5.7 KB URL and a 16 KB header cap arrives at
+about 170 rows. A register of a few hundred lines is the ordinary case.
+
+An over long `Location` header does not report that the file was too big. The
+navigation simply does not happen. The same symptom, from a completely
+different cause. `0046` parks the sheet in `app.import_drafts` and puts an id in
+the URL. The draft belongs to the person who pasted it, not to the company: an
+admin at the same company cannot read it, because a half checked import is not
+yet anybody else's business. Drafts older than six hours are swept by the next
+import, so nothing needs scheduling.
+
+### What these earned
+
+`13_tag_numbering.sql` asserts the properties rather than trusting them: numbers
+are unique, a deleted number is never reissued, an existing register is
+continued rather than restarted at one, a tag typed ahead by hand is stepped
+over, and, the one that matters, issuing a tag costs the same on a 4,000 asset
+register as on an empty one. It is phrased as a ratio rather than a wall clock
+figure so it means the same thing on a slow machine.
+
+That assertion was proved against the exact function that shipped broken: the
+counter version with the existence check removed, correct in every respect
+except speed. It fails. The fixed version passes.
+
+`tests-migrations.mjs` gained a third guard. PostgREST answers by name from a
+cached picture of the schema, and when it is stale the error explains nothing.
+"Could not find the 'description' column of 'assets' in the schema cache" after
+`0035` was this and nothing else. A migration creating something the app calls
+by name must now end with `notify pgrst, 'reload schema';`. The forty four
+migrations before `0045` predate the rule and are grandfathered: they were
+applied long ago, the cache has caught up, and rewriting them to add a line
+that only has an effect at apply time would be churn without a benefit.
 
 ## Specifications (0022)
 

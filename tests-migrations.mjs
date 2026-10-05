@@ -156,5 +156,58 @@ for (const f of files) {
 }
 if (toneBad === 0) pass(`every app.log() tone argument is typed (${toneChecked} checked)`);
 
-console.log(failed ? '\n✗ migration numbering is ambiguous' : '\n✓ migration numbering is unambiguous');
+// ── a migration adding something the app calls must reload the schema cache ──
+// PostgREST answers by name from a cached picture of the schema. When it is
+// stale the error says nothing useful about why: "Could not find the
+// 'description' column of 'assets' in the schema cache" after 0035, and a
+// missing function reads as the button simply not working.
+//
+// The forty four migrations before 0045 predate this rule. They were applied
+// long ago and the cache has caught up with them, so rewriting them to add a
+// line that only has an effect at apply time would be churn without a benefit.
+// The rule starts where it was written and the exception list cannot grow.
+const RELOAD_RULE_FROM = 45;
+
+const callsByName = (name) => {
+  // Crude on purpose: a name appearing anywhere in src is enough. A false
+  // positive costs one harmless line in a migration; a false negative costs
+  // somebody an afternoon.
+  try {
+    return readdirSync(join(process.cwd(), 'src'), { recursive: true })
+      .filter((f) => typeof f === 'string' && /\.(ts|tsx)$/.test(f))
+      .some((f) => {
+        try {
+          return readFileSync(join(process.cwd(), 'src', f), 'utf8').includes(`'${name}'`);
+        } catch { return false; }
+      });
+  } catch { return false; }
+};
+
+let reloadChecked = 0;
+for (const f of files) {
+  if (Number(f.slice(0, 4)) < RELOAD_RULE_FROM) continue;
+  const body = read(f);
+  if (!body) continue;
+
+  const created = [...body.matchAll(
+    /create\s+(?:or\s+replace\s+)?(?:function|table)\s+(?:if\s+not\s+exists\s+)?app\.([a-z0-9_]+)/gi,
+  )].map((m) => m[1]);
+
+  const exposed = [...new Set(created)].filter(callsByName);
+  if (!exposed.length) continue;
+
+  reloadChecked++;
+  if (!/notify\s+pgrst\s*,\s*'reload schema'/i.test(body)) {
+    fail(`${f} creates ${exposed.join(', ')}, which the app calls by name,`);
+    fail(`  but never asks PostgREST to re-read the schema. Add at the end:`);
+    fail(`    notify pgrst, 'reload schema';`);
+  }
+}
+if (!failed && reloadChecked) {
+  pass(`every migration exposing a new name reloads the schema cache (${reloadChecked} checked)`);
+}
+
+// The file started out checking numbering alone and has since grown two more
+// guards, so the verdict says what was actually checked.
+console.log(failed ? '\n✗ migrations need attention' : '\n✓ migrations are well formed');
 process.exit(failed ? 1 : 0);

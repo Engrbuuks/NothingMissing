@@ -13,24 +13,73 @@ export const dynamic = 'force-dynamic';
  * with commit off, reports exactly what it would create and what it would
  * reject, and writes nothing until the person says yes.
  */
+/** One row of app.import_drafts, as read_import_draft() returns it. */
+type Draft = {
+  kind: string;
+  sheet: string;
+  branch: string | null;
+  existing: string | null;
+  city: string | null;
+  where_name: string | null;
+};
+
 export default async function Review({
   searchParams,
 }: {
   searchParams: {
+    draft?: string;
     branch?: string; existing?: string; city?: string; sheet?: string;
     kind?: string; where?: string;
   };
 }) {
-  if (searchParams.kind === 'stock') {
-    return <StockReview raw={searchParams.sheet ?? ''} where={searchParams.where ?? ''} />;
-  }
-  const raw = searchParams.sheet ?? '';
-  const branch = searchParams.branch ?? '';
-  const existing = searchParams.existing ?? '';
-
-  const { rows, headers, unknown } = parseSheet(raw);
+  // The sheet arrives as a parked draft, read back by id. The older shape, with
+  // the sheet in the query string, is still honoured so a link somebody left
+  // open mid-import does not break under them.
   const supabase = sb();
   const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+
+  let d: Draft | null = null;
+
+  if (searchParams.draft) {
+    const { data } = await supabase
+      .rpc('read_import_draft', { p_id: searchParams.draft })
+      .maybeSingle();
+    d = (data ?? null) as Draft | null;
+
+    if (!d) {
+      return (
+        <Shell current="import" title="Check before importing" subtitle="Nothing has been written yet">
+          <div className="card">
+            <div className="empty">
+              <h4>That preview has expired</h4>
+              <p>
+                A pasted sheet is held for a few hours and then cleared. Nothing was
+                imported. Paste the rows again and the preview will be exactly the same.
+              </p>
+              <a className="btn btn-p" href="/import" style={{ marginTop: 18 }}>Start again</a>
+            </div>
+          </div>
+        </Shell>
+      );
+    }
+  }
+
+  const kind = d?.kind ?? searchParams.kind;
+  if (kind === 'stock') {
+    return (
+      <StockReview
+        raw={d?.sheet ?? searchParams.sheet ?? ''}
+        where={d?.where_name ?? searchParams.where ?? ''}
+      />
+    );
+  }
+
+  const raw = d?.sheet ?? searchParams.sheet ?? '';
+  const branch = d?.branch ?? searchParams.branch ?? '';
+  const existing = d?.existing ?? searchParams.existing ?? '';
+  const city = d?.city ?? searchParams.city ?? '';
+
+  const { rows, headers, unknown } = parseSheet(raw);
 
   const { data: preview, error } = co
     ? await supabase.rpc('import_branch', {
@@ -39,7 +88,7 @@ export default async function Review({
         p_rows: rows,
         p_commit: false,
         p_location_id: existing || null,
-        p_city: searchParams.city || null,
+        p_city: city || null,
       })
     : { data: null, error: null as any };
 
@@ -187,7 +236,7 @@ export default async function Review({
         <input type="hidden" name="sheet" value={raw} />
         <input type="hidden" name="branch" value={branch} />
         <input type="hidden" name="existing" value={existing} />
-        <input type="hidden" name="city" value={searchParams.city ?? ''} />
+        <input type="hidden" name="city" value={city} />
         <a className="btn btn-g" href="/import">Go back and change it</a>
         <button className="btn btn-p" type="submit" style={{ marginLeft: 'auto' }}
                 disabled={(p.assets ?? 0) === 0}>
