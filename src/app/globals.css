@@ -1656,3 +1656,18 @@ body::before{
 .csvpick-n b{color:var(--text-1);font-family:var(--mono);font-size:12px}
 .csvpick-n.bad{color:var(--bad)}
 .csvpick-n.bad b{color:var(--bad)}
+
+/* ---------- the "only one column is required" explainer ---------- */
+.minimal{border:1px solid var(--line);border-radius:12px;background:#FBFBFE;margin-bottom:14px}
+.minimal>summary{padding:11px 14px;font-size:13px;cursor:pointer;list-style:none;color:var(--text-2)}
+.minimal>summary::-webkit-details-marker{display:none}
+.minimal>summary::before{content:'›';display:inline-block;margin-right:9px;font-weight:700;color:var(--brand);transition:transform .15s}
+.minimal[open]>summary::before{transform:rotate(90deg)}
+.minimal>summary b{color:var(--text-1)}
+.minimal-b{padding:0 14px 14px 32px;font-size:12.5px;color:var(--text-3);line-height:1.6}
+.minimal-b p{margin:0 0 9px}
+.minimal-b pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin:0 0 9px;overflow-x:auto;color:var(--text-1)}
+
+/* ---------- "blanks are fine" note above the paste box ---------- */
+.blanks{font-size:12.5px;line-height:1.6;color:var(--text-3);background:#FBFBFE;border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin:0 0 14px}
+.blanks b{color:var(--text-1)}

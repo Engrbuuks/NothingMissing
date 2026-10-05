@@ -10,6 +10,7 @@ const HEADER_ALIASES = {
   holder: ['holder','assigned to','user','custodian','assignee','department','room'],
   acquired: ['acquired','acquired on','purchase date','date purchased','date'],
   cost: ['cost','purchase cost','value','amount','price'],
+  units: ['units','unit','qty','quantity','number','no of units','count','pieces','nos'],
 };
 /** Inventory files use some of the same words for different things: "Code" is
  *  an asset tag on a register and a SKU on a stock list. */
@@ -43,6 +44,8 @@ const headerCases = [
   ['Make','brand'], ['Manufacturer','brand'], ['Model No','model'],
   ['Assigned To','holder'], ['Department','holder'], ['Purchase Cost','cost'],
   ['Date Purchased','acquired'], ['Nonsense Column',null],
+  ['Units','units'], ['Qty','units'], ['Quantity','units'], ['No of Units','units'],
+  ['Pieces','units'],
 ];
 let bad=0;
 for(const [input,want] of headerCases){

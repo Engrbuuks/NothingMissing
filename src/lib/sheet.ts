@@ -23,6 +23,9 @@ const HEADER_ALIASES: Record<string, string[]> = {
   holder: ['holder', 'assigned to', 'user', 'custodian', 'assignee', 'department', 'room'],
   acquired: ['acquired', 'acquired on', 'purchase date', 'date purchased', 'date'],
   cost: ['cost', 'purchase cost', 'value', 'amount', 'price'],
+  // How many of this thing. One line can be fifty chairs, each still becoming
+  // its own asset with its own tag.
+  units: ['units', 'unit', 'qty', 'quantity', 'number', 'no of units', 'count', 'pieces', 'nos'],
 };
 
 /**

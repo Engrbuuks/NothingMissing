@@ -98,6 +98,13 @@ export default async function Import({
           </div>
           <div style={{ padding: 20 }}>
             <CsvFile target="sheet" />
+
+            <p className="blanks">
+              <b>Blanks are fine.</b> Keep every column and fill in what you have. A row with
+              only a name imports; so does one missing a serial, a model or a cost. Nothing is
+              filled in with a guess, and the preview shows exactly what will be created.
+            </p>
+
             <textarea
               className="inp mono"
               name="sheet"
@@ -113,8 +120,19 @@ Meeting table,,Furniture,Tables,Ergo,6-seater Oak,Boardroom,185000`}
 
             <div className="cols">
               <div>
-                <h4>The only column you must have</h4>
-                <p><span className="mono">Name</span> — what the thing is.</p>
+                <h4>One line can be many things</h4>
+                <p>
+                  <span className="mono">Units</span> is how many you have. Fifty identical
+                  chairs is one line with 50 in it, not fifty lines. Each one still becomes its
+                  own asset with its own tag, so one can go for repair without the rest moving.
+                </p>
+              </div>
+              <div>
+                <h4>The only column you must fill</h4>
+                <p>
+                  <span className="mono">Name</span>, what the thing is. Leave any other cell
+                  blank and the row still imports.
+                </p>
               </div>
               <div>
                 <h4>Everything else is optional</h4>
@@ -123,7 +141,8 @@ Meeting table,,Furniture,Tables,Ergo,6-seater Oak,Boardroom,185000`}
                   {' '}<span className="mono">Type</span>, <span className="mono">Make</span>,
                   {' '}<span className="mono">Model</span>, <span className="mono">Assigned To</span>,
                   {' '}<span className="mono">Purchase Cost</span>,{' '}
-                  <span className="mono">Date</span>. Give what you have.
+                  <span className="mono">Date</span>. Give what you have. Purchase cost is the
+                  cost of one, not the total for the line.
                 </p>
               </div>
               <div>
@@ -224,6 +243,13 @@ function StockImport({ error, sites }: { error?: string; sites: any[] }) {
           </div>
           <div style={{ padding: 20 }}>
             <CsvFile target="sheet" />
+
+            <p className="blanks">
+              <b>Blanks are fine.</b> Keep every column and fill in what you have. A missing SKU
+              is generated, a missing unit becomes <span className="mono">units</span>, and a
+              missing quantity becomes zero so you can count it in later.
+            </p>
+
             <textarea
               className="inp mono"
               name="sheet"

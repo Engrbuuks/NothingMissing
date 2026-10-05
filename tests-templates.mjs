@@ -42,5 +42,29 @@ for (const [label,kind] of [['ASSETS','assets'],['STOCK','stock']]) {
   const nameIdx=mapped.indexOf('name');
   lines.slice(1).forEach((l,i)=>{ if(!l.split(',')[nameIdx]?.trim()){console.log(`  FAIL row ${i+1} has no name`); bad++;}});
 }
-console.log(bad?`\n✗ ${bad} problems`:'\n✓ both templates import cleanly');
+// ---- blanks must be tolerated ---------------------------------------------
+// The import page promises that a row missing most of its cells still imports.
+// The templates carry such a row on purpose; this checks it survives parsing
+// with its one required column intact, so the promise and the parser cannot
+// drift apart.
+for (const [label,kind,required] of [['ASSETS','assets','name'],['STOCK','stock','name']]) {
+  const m = route.match(new RegExp(`const ${label} = \`([\\s\\S]*?)\`;`));
+  const lines = m[1].split('\n').filter(l=>l.trim());
+  const mapped = lines[0].split(',').map(h=>canon(h,kind));
+  const parsed = lines.slice(1).map(l=>{
+    const cells=l.split(','); const row={};
+    mapped.forEach((k,i)=>{ if(k && cells[i] && cells[i].trim()) row[k]=cells[i].trim(); });
+    return row;
+  });
+  const sparsest = parsed.reduce((a,b)=>Object.keys(a).length<=Object.keys(b).length?a:b);
+  const filled = Object.keys(sparsest).length;
+  console.log(`\n${label}: sparsest row keeps ${filled} of ${mapped.filter(Boolean).length} columns`);
+  if (!sparsest[required]) { console.log(`  FAIL the sparsest row lost its ${required}`); bad++; }
+  else if (filled === mapped.filter(Boolean).length) {
+    console.log(`  FAIL every template row is completely filled, so blanks are never exercised`);
+    bad++;
+  } else console.log(`  ✓ a mostly blank row still carries its ${required}`);
+}
+
+console.log(bad?`\n✗ ${bad} problems`:'\n✓ templates import cleanly and tolerate blanks');
 process.exit(bad?1:0);
