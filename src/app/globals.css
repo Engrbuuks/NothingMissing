@@ -80,6 +80,8 @@ tbody tr:hover{background:#FAFAFE}
 .notice.bad p{color:#B5332B}
 .notice.warn{background:var(--warn-soft)}
 .notice.warn p{color:#A6700A}
+.notice.ok{background:var(--ok-soft)}
+.notice.ok p{color:#0A7A45}
 
 /* shell */
 .shell{display:flex;min-height:100vh}

@@ -43,6 +43,7 @@ export default async function Import({
       <div className="segmented" style={{ marginBottom: 16 }}>
         <a className="on" href="/import">Assets</a>
         <a href="/import?kind=stock">Inventory</a>
+        <a href="/import/history">History</a>
       </div>
 
       <div className="notice">
@@ -204,6 +205,7 @@ function StockImport({ error, sites }: { error?: string; sites: any[] }) {
       <div className="segmented" style={{ marginBottom: 16 }}>
         <a href="/import">Assets</a>
         <a className="on" href="/import?kind=stock">Inventory</a>
+        <a href="/import/history">History</a>
       </div>
 
       <div className="notice">

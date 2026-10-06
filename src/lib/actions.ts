@@ -1825,6 +1825,52 @@ export async function commitBranchImport(formData: FormData): Promise<void> {
   redirect(`/assets?imported=${(data as any)?.assets ?? 0}`);
 }
 
+/**
+ * Taking an import back off the register.
+ *
+ * `expect` is the count the page was showing when the button was drawn. The
+ * database refuses if the register has moved since, rather than removing a
+ * different number of assets than the person was looking at. A stale tab and a
+ * second click is otherwise a quiet way to delete the wrong thing.
+ */
+export async function undoAssetImport(formData: FormData): Promise<void> {
+  const run = String(formData.get('run') ?? '');
+  const expect = String(formData.get('expect') ?? '');
+
+  const supabase = sb();
+  const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+  if (!co) redirect('/import/history?error=' + encodeURIComponent('No company in scope.'));
+
+  const { data, error } = await supabase.rpc('undo_asset_import', {
+    p_company: co.id,
+    p_run_id: Number(run),
+    p_expect: expect === '' ? null : Number(expect),
+  });
+
+  revalidatePath('/assets');
+  revalidatePath('/import/history');
+  revalidatePath('/locations');
+
+  if (error) {
+    redirect('/import/history?error=' + encodeURIComponent(error.message));
+  }
+
+  const r = (data ?? {}) as { removed?: number; kept?: number; location?: string };
+  const removed = r.removed ?? 0;
+  const kept = r.kept ?? 0;
+
+  const said =
+    removed === 0 && kept === 0
+      ? 'Nothing from that import was still on the register.'
+      : `${removed.toLocaleString()} asset${removed === 1 ? '' : 's'} removed from ` +
+        `${r.location ?? 'that import'}.` +
+        (kept > 0
+          ? ` ${kept.toLocaleString()} kept, because ${kept === 1 ? 'it has' : 'they have'} been used since.`
+          : '');
+
+  redirect('/import/history?done=' + encodeURIComponent(said));
+}
+
 export async function setMemberRole(formData: FormData): Promise<void> {
   const supabase = sb();
   const { data: co } = await supabase.from('companies').select('id').limit(1).maybeSingle();

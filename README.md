@@ -61,7 +61,7 @@ then open `http://eppme.localhost:3000`.
     src/lib/actions.ts       server actions — each calls a database function
     src/app/diagnostics      checks the wiring and reports what this session reaches
 
-    backend/                 46 Postgres migrations, the test suite, bootstrap.sql
+    backend/                 47 Postgres migrations, the test suite, bootstrap.sql
     public/prototype/        the original clickable prototype, kept as the spec
 
 The prototype stays reachable at `/prototype/app.html`. It is a specification,
@@ -91,7 +91,7 @@ write policy, purchase cost behind its own table, an append-only audit log, and
 the atomic transfer acceptance.
 
 To set up a real project: run **every** migration in `backend/supabase/migrations`
-in numerical order — `0001` through `0046` — in the Supabase SQL editor, then
+in numerical order, `0001` through `0047`, in the Supabase SQL editor, then
 `bootstrap.sql` once.
 
 Run them **all**. An earlier version of this file said `0001` through `0011`,
@@ -708,7 +708,7 @@ shell happens to glob them, which is not a thing to leave in a repository. The
 orphaned migration and its two dead actions are gone; the pages only ever used
 the surviving one.
 
-## The Import button did nothing (0045, 0046)
+## The Import button did nothing (0045, 0046, 0047)
 
 Reported as "the Import button at the end of the process is not working", which
 is the hardest kind of report to act on and the most honest description of what
@@ -755,6 +755,54 @@ The counter also fixes something `0042` had to leave standing. `max()` falls
 back when the highest numbered assets are deleted, so their numbers came round
 again and a printed label could end up naming a different object. A counter
 only goes up.
+
+### Correction: the imports committed
+
+The account above is incomplete in the way that mattered most to the person
+using it. What the gateway kills is the request, not the transaction. Postgres
+carries on, finishes the loop and commits. So a timed out import did not write
+nothing. It wrote everything, said nothing, and left no reason not to press the
+button again.
+
+Press it four times and the register holds four copies, each with its own tags,
+each looking exactly as legitimate as the first. That was found from the
+register rather than from the code, after the timeout had already been fixed.
+
+Nothing recorded which assets an import created, so there was nothing to undo
+with. Except that there was, and it is exact rather than a reconstruction:
+`now()` is the transaction timestamp, not the clock, so every asset inserted by
+one import carries an identical `created_at`, and the audit row written at the
+end of the same transaction carries that same value as its `occurred_at`. An
+import run is therefore recoverable from the audit log alone, including runs
+from weeks ago, with no new bookkeeping and nothing to backfill.
+
+`0047` adds that: `/import/history` lists every run, marks a run whose rows
+match an earlier one at the same place as a repeat, and removes one in a single
+action. The earliest run is never marked a repeat, so removing everything marked
+leaves exactly one copy.
+
+An asset that has been used is never removed. If it has moved, been assigned,
+serviced, photographed, counted or named on a request, it stays and is counted
+under *In use*. The foreign keys would have refused some of that on their own,
+but maintenance events, attachments and typed specifications all cascade, so a
+naive delete would take a photograph somebody shot and a service record
+somebody entered with it, without a word. Every table that can refer to an
+asset is checked explicitly instead.
+
+The removable count the page shows is passed back with the button and the
+database refuses if the register has moved since. A stale tab plus a second
+click is otherwise a quiet way to delete the wrong thing.
+
+That test lives in two places, which is a drift risk worth naming: the delete
+asks per asset, because it runs once per asset being removed, and the page asks
+set at a time, because per asset cost 303 ms on one page load at nine runs and
+grew with the register multiplied by the number of imports. `15_import_undo.sql`
+fails if the two ever name a different set of tables, and fails again if the
+list they share stops covering every foreign key pointing at an asset.
+
+Undoing is owner or admin only. Retiring an asset is a manager's job, because it
+leaves a record of a thing that existed. This erases rows, which is a different
+kind of act.
 
 ### A second way the same button could do nothing
 
